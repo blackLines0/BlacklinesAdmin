@@ -97,6 +97,14 @@ export const adminUsers: AdminUser[] = [
   { nom: "Selom Agbota", email: "selom@blacklines.tg", initiales: "SA", couleur: "#94A3B8", role: "Gestionnaire", acces: "Capsule Textile", derniereConnexion: "12 août, 09:50", statut: "Suspendu" },
 ];
 
+export function getProductBySku(sku: string): AdminProduct | undefined {
+  return adminProducts.find((p) => p.sku === sku);
+}
+
+export function getOrderById(id: string): AdminOrder | undefined {
+  return adminOrders.find((o) => o.id === `#${id}`);
+}
+
 export function statusBadgeClass(statut: string): string {
   switch (statut) {
     case "Payée":

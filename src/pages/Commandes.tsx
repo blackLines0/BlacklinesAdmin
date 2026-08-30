@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { adminOrders, brandLabels, type AdminOrder } from "../lib/mockData";
 
@@ -131,9 +132,9 @@ export default function Commandes() {
                     </select>
                   </td>
                   <td>
-                    <button className="icon-action" aria-label="Voir">
+                    <Link className="icon-action" aria-label="Voir" to={`/commandes/${order.id.replace("#", "")}`}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
