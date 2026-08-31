@@ -1,157 +1,180 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
-import { adminOrders, brandLabels, type AdminOrder } from "../lib/mockData";
+import { apiFetch } from "../lib/api";
+import {
+  brandTagClass,
+  formatDate,
+  formatPrice,
+  ORDER_STATUS_LABELS,
+  type OrderStatus,
+} from "../lib/format";
 
-const STATUS_OPTIONS: AdminOrder["statut"][] = ["En attente", "Payée", "Expédiée", "Livrée", "Annulée"];
-const STATUS_BG: Record<AdminOrder["statut"], string> = {
-  "En attente": "var(--warning-soft)",
-  Payée: "var(--success-soft)",
-  Expédiée: "var(--info-soft)",
-  Livrée: "#F1F5F9",
-  Annulée: "var(--danger-soft)",
-};
-const STATUS_COLOR: Record<AdminOrder["statut"], string> = {
-  "En attente": "var(--warning)",
-  Payée: "var(--success)",
-  Expédiée: "var(--info)",
-  Livrée: "var(--ink-soft)",
-  Annulée: "var(--danger)",
-};
+interface OrderItem {
+  id: string;
+  quantite: number;
+  prixUnitaire: number;
+  product: { nom: string; brand: { slug: string; nom: string } };
+}
 
-const FILTER_TABS: { label: string; statut?: AdminOrder["statut"] }[] = [
-  { label: "Toutes" },
-  { label: "En attente", statut: "En attente" },
-  { label: "Payées", statut: "Payée" },
-  { label: "Expédiées", statut: "Expédiée" },
-  { label: "Livrées", statut: "Livrée" },
-  { label: "Annulées", statut: "Annulée" },
-];
+interface Order {
+  id: string;
+  statut: OrderStatus;
+  montantTotal: number;
+  moyenPaiement: string;
+  createdAt: string;
+  customer: { nom: string };
+  items: OrderItem[];
+}
+
+const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
+const STATUS_BG: Record<OrderStatus, string> = {
+  en_attente: "var(--warning-soft)",
+  payee: "var(--success-soft)",
+  expediee: "var(--info-soft)",
+  livree: "#F1F5F9",
+  annulee: "var(--danger-soft)",
+};
+const STATUS_COLOR: Record<OrderStatus, string> = {
+  en_attente: "var(--warning)",
+  payee: "var(--success)",
+  expediee: "var(--info)",
+  livree: "var(--ink-soft)",
+  annulee: "var(--danger)",
+};
 
 export default function Commandes() {
-  const [orders, setOrders] = useState(adminOrders);
-  const [tab, setTab] = useState("Toutes");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<OrderStatus | "all">("all");
 
-  function updateStatus(id: string, statut: AdminOrder["statut"]) {
+  useEffect(() => {
+    apiFetch<Order[]>("/admin/orders")
+      .then(setOrders)
+      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { en_attente: 0, payee: 0, expediee: 0, livree: 0, annulee: 0 };
+    for (const o of orders) c[o.statut] = (c[o.statut] ?? 0) + 1;
+    return c;
+  }, [orders]);
+
+  const filtered = tab === "all" ? orders : orders.filter((o) => o.statut === tab);
+
+  async function updateStatus(id: string, statut: OrderStatus) {
+    const previous = orders;
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, statut } : o)));
+
+    try {
+      await apiFetch(`/admin/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ statut }),
+      });
+    } catch (err) {
+      setOrders(previous);
+      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
+    }
   }
 
-  const activeStatut = FILTER_TABS.find((t) => t.label === tab)?.statut;
-  const filtered = activeStatut ? orders.filter((o) => o.statut === activeStatut) : orders;
-
   return (
-    <AdminLayout title="Commandes" crumb="312 commandes au total" searchPlaceholder="Rechercher une commande...">
+    <AdminLayout title="Commandes" crumb={`${orders.length} commandes au total`} searchPlaceholder="Rechercher une commande...">
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">En attente</span><div className="kpi-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg></div></div>
-          <div className="kpi-value">8</div>
+          <div className="kpi-value">{counts.en_attente}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Payées</span><div className="kpi-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg></div></div>
-          <div className="kpi-value">214</div>
+          <div className="kpi-value">{counts.payee}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Expédiées</span><div className="kpi-icon cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h13v13H3z" /><path d="M16 8h4l3 4v4h-7V8Z" /><circle cx="7.5" cy="18.5" r="1.8" /><circle cx="18" cy="18.5" r="1.8" /></svg></div></div>
-          <div className="kpi-value">67</div>
+          <div className="kpi-value">{counts.expediee}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Annulées</span><div className="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--danger)" }}><circle cx="12" cy="12" r="9" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg></div></div>
-          <div className="kpi-value">23</div>
+          <div className="kpi-value">{counts.annulee}</div>
         </div>
       </div>
 
       <div className="panel">
         <div className="filter-bar">
           <div className="filter-tabs">
-            {FILTER_TABS.map((t) => (
-              <span
-                key={t.label}
-                className={`filter-tab${tab === t.label ? " active" : ""}`}
-                onClick={() => setTab(t.label)}
-                style={{ cursor: "pointer" }}
-              >
-                {t.label}
+            <span className={`filter-tab${tab === "all" ? " active" : ""}`} onClick={() => setTab("all")} style={{ cursor: "pointer" }}>Toutes</span>
+            {STATUS_OPTIONS.map(([value, label]) => (
+              <span key={value} className={`filter-tab${tab === value ? " active" : ""}`} onClick={() => setTab(value)} style={{ cursor: "pointer" }}>
+                {label}
               </span>
             ))}
           </div>
-          <div className="spacer" />
-          <select className="select-sm">
-            <option>Marque : Toutes</option>
-            <option>Capsule Textile</option>
-            <option>Spicysoul</option>
-            <option>Rihan Wa Harir</option>
-          </select>
-          <select className="select-sm">
-            <option>Paiement : Tous</option>
-            <option>Mobile Money</option>
-            <option>Carte bancaire</option>
-          </select>
         </div>
 
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th><input type="checkbox" /></th>
-                <th>Commande</th>
-                <th>Client</th>
-                <th>Date</th>
-                <th>Marque</th>
-                <th>Paiement</th>
-                <th>Montant</th>
-                <th>Statut</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((order) => (
-                <tr key={order.id}>
-                  <td><input type="checkbox" /></td>
-                  <td className="cell-primary">{order.id}</td>
-                  <td>{order.client}</td>
-                  <td className="cell-muted">{order.date}</td>
-                  <td><span className={`brand-tag ${order.brand}`}>{brandLabels[order.brand]}</span></td>
-                  <td className="cell-muted">{order.paiement}</td>
-                  <td className="cell-primary">{order.montant}</td>
-                  <td>
-                    <select
-                      className="select-sm"
-                      value={order.statut}
-                      onChange={(e) => updateStatus(order.id, e.target.value as AdminOrder["statut"])}
-                      style={{
-                        border: "none",
-                        background: STATUS_BG[order.statut],
-                        color: STATUS_COLOR[order.statut],
-                        fontWeight: 700,
-                        padding: "5px 10px",
-                      }}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <Link className="icon-action" aria-label="Voir" to={`/commandes/${order.id.replace("#", "")}`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </Link>
-                  </td>
+        {loading ? (
+          <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
+        ) : error ? (
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Commande</th>
+                  <th>Client</th>
+                  <th>Date</th>
+                  <th>Marque</th>
+                  <th>Paiement</th>
+                  <th>Montant</th>
+                  <th>Statut</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="pagination">
-          <span className="info">Affichage de 1 à {filtered.length} sur 312 commandes</span>
-          <div className="page-btns">
-            <button className="page-btn">‹</button>
-            <button className="page-btn active">1</button>
-            <button className="page-btn">2</button>
-            <button className="page-btn">3</button>
-            <button className="page-btn">›</button>
+              </thead>
+              <tbody>
+                {filtered.map((order) => {
+                  const brand = order.items[0]?.product.brand;
+                  return (
+                    <tr key={order.id}>
+                      <td className="cell-primary">#{order.id.slice(-6).toUpperCase()}</td>
+                      <td>{order.customer.nom}</td>
+                      <td className="cell-muted">{formatDate(order.createdAt)}</td>
+                      <td>{brand ? <span className={`brand-tag ${brandTagClass(brand.slug)}`}>{brand.nom}</span> : "—"}</td>
+                      <td className="cell-muted">{order.moyenPaiement}</td>
+                      <td className="cell-primary">{formatPrice(order.montantTotal)}</td>
+                      <td>
+                        <select
+                          className="select-sm"
+                          value={order.statut}
+                          onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
+                          style={{
+                            border: "none",
+                            background: STATUS_BG[order.statut],
+                            color: STATUS_COLOR[order.statut],
+                            fontWeight: 700,
+                            padding: "5px 10px",
+                          }}
+                        >
+                          {STATUS_OPTIONS.map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <Link className="icon-action" aria-label="Voir" to={`/commandes/${order.id}`}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 ? (
+                  <tr><td colSpan={8} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune commande</td></tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
       </div>
     </AdminLayout>
   );

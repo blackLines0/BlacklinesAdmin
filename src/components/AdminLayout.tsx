@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrateur",
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
   {
     href: "/commandes",
     label: "Commandes",
-    count: 12,
+    countKey: "commandes",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 8H6" />
@@ -38,7 +39,7 @@ const NAV_ITEMS = [
   {
     href: "/produits",
     label: "Produits",
-    count: 48,
+    countKey: "produits",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" />
@@ -73,6 +74,16 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
+  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0 });
+
+  useEffect(() => {
+    apiFetch<unknown[]>("/admin/orders")
+      .then((data) => setCounts((prev) => ({ ...prev, commandes: data.length })))
+      .catch(() => {});
+    apiFetch<unknown[]>("/admin/products")
+      .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))
+      .catch(() => {});
+  }, []);
 
   function handleLogout() {
     logout();
@@ -103,7 +114,7 @@ export function AdminLayout({
             >
               {item.icon}
               {item.label}
-              {item.count !== undefined ? <span className="count">{item.count}</span> : null}
+              {item.countKey ? <span className="count">{counts[item.countKey] ?? 0}</span> : null}
             </Link>
           ))}
         </div>

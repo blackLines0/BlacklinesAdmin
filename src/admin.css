@@ -244,8 +244,8 @@ tbody tr:hover{background:#FBFCFE;}
 .back-link:hover{color:var(--ink);}
 
 /* ---------- LOGIN ---------- */
-.login-page{min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--sidebar); padding:24px;}
-.login-card{background:var(--panel); border-radius:16px; padding:40px 36px; width:100%; max-width:380px;}
+.login-page{min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(160deg,#F4F6FB,#E7EBF3); padding:24px;}
+.login-card{background:var(--panel); border-radius:16px; padding:40px 36px; width:100%; max-width:380px; border:1px solid var(--line); box-shadow:0 20px 40px -20px rgba(15,23,42,0.18);}
 .login-brand{display:flex; align-items:center; gap:10px; margin-bottom:28px;}
 .login-brand .name{font-weight:700; font-size:17px;}
 .login-card h1{font-size:20px; font-weight:700; margin-bottom:6px;}
