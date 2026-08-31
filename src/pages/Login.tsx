@@ -1,14 +1,28 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    navigate("/dashboard");
+    setError(null);
+    setLoading(true);
+
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Échec de la connexion");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -47,7 +61,10 @@ export default function Login() {
               required
             />
           </div>
-          <button className="btn btn-primary" type="submit">Se connecter</button>
+          {error ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{error}</p> : null}
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? "Connexion..." : "Se connecter"}
+          </button>
         </form>
       </div>
     </div>

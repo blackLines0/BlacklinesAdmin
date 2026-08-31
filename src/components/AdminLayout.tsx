@@ -1,5 +1,17 @@
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrateur",
+  gestionnaire: "Gestionnaire",
+  support: "Support",
+};
+
+function initialsOf(nom: string): string {
+  const parts = nom.trim().split(/\s+/);
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
 
 const NAV_ITEMS = [
   {
@@ -57,6 +69,15 @@ export function AdminLayout({
   children: ReactNode;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const initials = user ? initialsOf(user.nom) : "";
+  const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   return (
     <div className="app">
@@ -106,8 +127,11 @@ export function AdminLayout({
 
         <div className="sidebar-footer">
           <div className="admin-profile">
-            <div className="admin-avatar">MN</div>
-            <div className="info"><div className="who">Malaika Nabila</div><div className="role">Administratrice</div></div>
+            <div className="admin-avatar">{initials}</div>
+            <div className="info"><div className="who">{user?.nom}</div><div className="role">{roleLabel}</div></div>
+            <button className="icon-action" aria-label="Déconnexion" onClick={handleLogout} style={{ marginLeft: "auto", color: "var(--sidebar-soft)" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -127,7 +151,7 @@ export function AdminLayout({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
               <span className="notif-dot" />
             </button>
-            <div className="admin-avatar" style={{ width: 34, height: 34 }}>MN</div>
+            <div className="admin-avatar" style={{ width: 34, height: 34 }}>{initials}</div>
           </div>
         </div>
 
