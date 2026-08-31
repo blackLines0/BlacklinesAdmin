@@ -47,6 +47,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/clients",
+    label: "Clients",
+    countKey: "clients",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+      </svg>
+    ),
+  },
+  {
     href: "/utilisateurs",
     label: "Utilisateurs",
     icon: (
@@ -74,11 +84,14 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
-  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0 });
 
   useEffect(() => {
     apiFetch<unknown[]>("/admin/orders")
       .then((data) => setCounts((prev) => ({ ...prev, commandes: data.length })))
+      .catch(() => {});
+    apiFetch<unknown[]>("/admin/customers")
+      .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))
       .catch(() => {});
     apiFetch<unknown[]>("/admin/products")
       .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))
@@ -94,13 +107,7 @@ export function AdminLayout({
     <div className="app">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <svg className="logo-mark" viewBox="0 0 130 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <polyline points="8,6 8,34 14.5,54" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="square" />
-            <polyline points="28,6 28,26 34.5,40 28,54" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="square" />
-            <polyline points="48,6 54.5,20 48,34 54.5,54" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="square" />
-            <polyline points="68,6 74.5,18 68,30 74.5,42 68,54" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="square" />
-            <polyline points="88,6 94.5,15 88,24 94.5,33 88,42 94.5,54" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="square" />
-          </svg>
+          <img className="logo-mark" src="/logowhite.png" alt="Blacklines" />
           <div><div className="name">Blacklines</div><div className="tag">Espace admin</div></div>
         </div>
 

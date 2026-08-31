@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import ClientDetail from "./pages/ClientDetail";
+import Clients from "./pages/Clients";
 import Commandes from "./pages/Commandes";
 import CommandeDetail from "./pages/CommandeDetail";
 import Dashboard from "./pages/Dashboard";
@@ -18,6 +20,8 @@ function App() {
       <Route path="/produits/:id/modifier" element={<ProtectedRoute><ProduitForm /></ProtectedRoute>} />
       <Route path="/commandes" element={<ProtectedRoute><Commandes /></ProtectedRoute>} />
       <Route path="/commandes/:id" element={<ProtectedRoute><CommandeDetail /></ProtectedRoute>} />
+      <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+      <Route path="/clients/:id" element={<ProtectedRoute><ClientDetail /></ProtectedRoute>} />
       <Route path="/utilisateurs" element={<ProtectedRoute><Utilisateurs /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
