@@ -20,6 +20,7 @@ interface Product {
   id: string;
   nom: string;
   prix: number;
+  prixPromo: number | null;
   stock: number;
   statut: ProductStatus;
   images: string[];
@@ -135,7 +136,16 @@ export default function Produits() {
                       </div>
                     </td>
                     <td><span className={`brand-tag ${brandTagClass(product.brand.slug)}`}>{product.brand.nom}</span></td>
-                    <td className="cell-primary">{formatPrice(product.prix)}</td>
+                    <td className="cell-primary">
+                      {product.prixPromo ? (
+                        <>
+                          <span style={{ textDecoration: "line-through", color: "var(--muted)", fontWeight: 500, marginRight: 6 }}>{formatPrice(product.prix)}</span>
+                          <span style={{ color: "var(--danger)" }}>{formatPrice(product.prixPromo)}</span>
+                        </>
+                      ) : (
+                        formatPrice(product.prix)
+                      )}
+                    </td>
                     <td>{product.stock}</td>
                     <td><span className={`badge ${statusBadgeClass(product.statut)}`}>{PRODUCT_STATUS_LABELS[product.statut]}</span></td>
                     <td>

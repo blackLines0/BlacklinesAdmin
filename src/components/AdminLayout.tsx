@@ -37,6 +37,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/marques",
+    label: "Marques",
+    countKey: "marques",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M20.6 12.3 12.7 4.4a2 2 0 0 0-1.4-.6H5a2 2 0 0 0-2 2v6.3a2 2 0 0 0 .6 1.4l7.9 7.9a2 2 0 0 0 2.8 0l6.3-6.3a2 2 0 0 0 0-2.8Z" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/produits",
     label: "Produits",
     countKey: "produits",
@@ -84,7 +95,7 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
-  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0 });
 
   useEffect(() => {
     apiFetch<unknown[]>("/admin/orders")
@@ -92,6 +103,9 @@ export function AdminLayout({
       .catch(() => {});
     apiFetch<unknown[]>("/admin/customers")
       .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))
+      .catch(() => {});
+    apiFetch<unknown[]>("/brands")
+      .then((data) => setCounts((prev) => ({ ...prev, marques: data.length })))
       .catch(() => {});
     apiFetch<unknown[]>("/admin/products")
       .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))

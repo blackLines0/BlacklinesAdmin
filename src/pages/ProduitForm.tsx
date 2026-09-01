@@ -9,15 +9,40 @@ interface Brand {
   nom: string;
 }
 
+interface Category {
+  id: string;
+  nom: string;
+}
+
+interface SizeOption {
+  id: string;
+  label: string;
+  description: string | null;
+}
+
+interface BrandDetail {
+  id: string;
+  categories: Category[];
+  sizeOptions: SizeOption[];
+}
+
+interface ProductVariant {
+  sizeOptionId: string;
+  stock: number;
+}
+
 interface Product {
   id: string;
   nom: string;
   brandId: string;
+  categoryId: string | null;
   description: string | null;
   prix: number;
+  prixPromo: number | null;
   images: string[];
   stock: number;
   statut: "en_stock" | "stock_faible" | "epuise";
+  variants: { sizeOptionId: string; stock: number }[];
 }
 
 const STATUS_OPTIONS: { value: Product["statut"]; label: string }[] = [
@@ -32,6 +57,7 @@ export default function ProduitForm() {
   const isEdit = Boolean(id);
 
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [notFound, setNotFound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +65,9 @@ export default function ProduitForm() {
 
   const [nom, setNom] = useState("");
   const [brandId, setBrandId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [prix, setPrix] = useState("");
+  const [prixPromo, setPrixPromo] = useState("");
   const [stock, setStock] = useState("");
   const [statut, setStatut] = useState<Product["statut"]>("en_stock");
   const [description, setDescription] = useState("");
@@ -47,6 +75,7 @@ export default function ProduitForm() {
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [uploadingMain, setUploadingMain] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [variantStocks, setVariantStocks] = useState<Record<string, string>>({});
 
   const mainInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -61,22 +90,55 @@ export default function ProduitForm() {
   }, []);
 
   useEffect(() => {
+    const brand = brands.find((b) => b.id === brandId);
+    if (!brand) {
+      setBrandDetail(null);
+      return;
+    }
+
+    apiFetch<BrandDetail>(`/brands/${brand.slug}`)
+      .then(setBrandDetail)
+      .catch(() => setBrandDetail(null));
+  }, [brandId, brands]);
+
+  useEffect(() => {
     if (!id) return;
 
     apiFetch<Product>(`/admin/products/${id}`)
       .then((product) => {
         setNom(product.nom);
         setBrandId(product.brandId);
+        setCategoryId(product.categoryId ?? "");
         setPrix(String(product.prix));
+        setPrixPromo(product.prixPromo !== null ? String(product.prixPromo) : "");
         setStock(String(product.stock));
         setStatut(product.statut);
         setDescription(product.description ?? "");
         setMainImage(product.images[0] ?? null);
         setGalleryImages(product.images.slice(1));
+        setVariantStocks(
+          Object.fromEntries(product.variants.map((v) => [v.sizeOptionId, String(v.stock)])),
+        );
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  function toggleVariant(sizeOptionId: string, checked: boolean) {
+    setVariantStocks((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        next[sizeOptionId] = next[sizeOptionId] ?? "0";
+      } else {
+        delete next[sizeOptionId];
+      }
+      return next;
+    });
+  }
+
+  function setVariantStock(sizeOptionId: string, value: string) {
+    setVariantStocks((prev) => ({ ...prev, [sizeOptionId]: value }));
+  }
 
   async function handleMainImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -122,16 +184,23 @@ export default function ProduitForm() {
     setSubmitting(true);
 
     const images = [mainImage, ...galleryImages].filter((img): img is string => Boolean(img));
+    const variants: ProductVariant[] = Object.entries(variantStocks).map(([sizeOptionId, stockValue]) => ({
+      sizeOptionId,
+      stock: Number(stockValue) || 0,
+    }));
 
     try {
       const payload = {
         nom,
         brandId,
+        categoryId: categoryId || undefined,
         prix: Number(prix),
+        prixPromo: prixPromo ? Number(prixPromo) : undefined,
         stock: Number(stock),
         statut,
         description: description || undefined,
         images,
+        ...(brandDetail?.sizeOptions.length ? { variants } : {}),
       };
 
       if (isEdit) {
@@ -248,9 +317,18 @@ export default function ProduitForm() {
               </div>
               <div className="field">
                 <label>Marque</label>
-                <select value={brandId} onChange={(e) => setBrandId(e.target.value)} required>
+                <select value={brandId} onChange={(e) => { setBrandId(e.target.value); setCategoryId(""); setVariantStocks({}); }} required>
                   {brands.map((b) => (
                     <option key={b.id} value={b.id}>{b.nom}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Catégorie</label>
+                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                  <option value="">Aucune</option>
+                  {brandDetail?.categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nom}</option>
                   ))}
                 </select>
               </div>
@@ -267,7 +345,11 @@ export default function ProduitForm() {
                 <input type="number" value={prix} onChange={(e) => setPrix(e.target.value)} placeholder="22000" required />
               </div>
               <div className="field">
-                <label>Stock</label>
+                <label>Prix promo (FCFA, facultatif)</label>
+                <input type="number" value={prixPromo} onChange={(e) => setPrixPromo(e.target.value)} placeholder="Laisser vide si pas de promo" />
+              </div>
+              <div className="field">
+                <label>Stock {brandDetail?.sizeOptions.length ? "(si pas de taille)" : ""}</label>
                 <input type="number" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="34" required />
               </div>
               <div className="field full">
@@ -275,6 +357,35 @@ export default function ProduitForm() {
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du produit..." />
               </div>
             </div>
+
+            {brandDetail?.sizeOptions.length ? (
+              <div className="field full">
+                <label>Tailles disponibles pour ce produit</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {brandDetail.sizeOptions.map((s) => {
+                    const checked = s.id in variantStocks;
+                    return (
+                      <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 160 }}>
+                          <input type="checkbox" checked={checked} onChange={(e) => toggleVariant(s.id, e.target.checked)} />
+                          {s.label}
+                        </label>
+                        {checked ? (
+                          <input
+                            type="number"
+                            placeholder="Stock"
+                            value={variantStocks[s.id]}
+                            onChange={(e) => setVariantStock(s.id, e.target.value)}
+                            style={{ width: 100 }}
+                          />
+                        ) : null}
+                        {s.description ? <span className="cell-muted" style={{ fontSize: 12 }}>{s.description}</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {error ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{error}</p> : null}
 

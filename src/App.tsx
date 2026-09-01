@@ -6,6 +6,8 @@ import Commandes from "./pages/Commandes";
 import CommandeDetail from "./pages/CommandeDetail";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import MarqueDetail from "./pages/MarqueDetail";
+import Marques from "./pages/Marques";
 import Produits from "./pages/Produits";
 import ProduitForm from "./pages/ProduitForm";
 import Utilisateurs from "./pages/Utilisateurs";
@@ -15,6 +17,8 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/marques" element={<ProtectedRoute><Marques /></ProtectedRoute>} />
+      <Route path="/marques/:id" element={<ProtectedRoute><MarqueDetail /></ProtectedRoute>} />
       <Route path="/produits" element={<ProtectedRoute><Produits /></ProtectedRoute>} />
       <Route path="/produits/nouveau" element={<ProtectedRoute><ProduitForm /></ProtectedRoute>} />
       <Route path="/produits/:id/modifier" element={<ProtectedRoute><ProduitForm /></ProtectedRoute>} />
