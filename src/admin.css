@@ -36,11 +36,24 @@ input, select{font-family:'Inter',sans-serif;}
 .app{display:grid; grid-template-columns:248px 1fr; min-height:100vh;}
 
 /* ---------- SIDEBAR ---------- */
-.sidebar{background:var(--sidebar); color:#fff; padding:24px 16px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh;}
-.sidebar-brand{display:flex; align-items:center; gap:10px; padding:6px 8px 28px;}
+.sidebar{background:var(--sidebar); color:#fff; padding:24px 16px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow:hidden;}
+.sidebar-brand{display:flex; align-items:center; gap:10px; padding:6px 8px 28px; flex-shrink:0;}
 .sidebar-brand .logo-mark{height:22px; width:auto;}
 .sidebar-brand .name{font-weight:700; font-size:15px; letter-spacing:-0.01em;}
 .sidebar-brand .tag{font-size:10px; color:var(--sidebar-soft); letter-spacing:0.08em; text-transform:uppercase; margin-top:1px;}
+
+.nav-scroll{flex:1; min-height:0; overflow-y:auto; margin:0 -6px; padding:0 6px;}
+.nav-scroll::-webkit-scrollbar{width:6px;}
+.nav-scroll::-webkit-scrollbar-thumb{background:#2A3448; border-radius:10px;}
+
+.nav-more{
+  display:flex; align-items:center; gap:11px; width:100%; padding:10px 12px; border-radius:8px;
+  font-size:13.5px; font-weight:500; color:#9CA3AF; background:none; border:none; cursor:pointer;
+  text-align:left; font-family:inherit;
+}
+.nav-more:hover{background:#1A2333; color:#D1D5DB;}
+.nav-more svg{width:17px; height:17px; flex-shrink:0; opacity:0.85; margin-left:auto; transition:transform .15s ease;}
+.nav-more.open svg{transform:rotate(180deg);}
 
 .nav-group{margin-bottom:22px;}
 .nav-label{font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:#6B7280; font-weight:700; padding:0 12px 10px;}

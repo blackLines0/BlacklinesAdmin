@@ -16,13 +16,17 @@ function initialsOf(nom: string): string {
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-const NAV_ITEMS: {
+interface NavItem {
   href: string;
   label: string;
   countKey?: string;
   roles: NavRole[];
   icon: ReactNode;
-}[] = [
+}
+
+// Daily-use pages, always visible. Avis is primary only for support — it's
+// their entire job — and lives in the secondary group for admin instead.
+const PRIMARY_NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
     label: "Tableau de bord",
@@ -47,6 +51,44 @@ const NAV_ITEMS: {
     ),
   },
   {
+    href: "/produits",
+    label: "Produits",
+    countKey: "produits",
+    roles: ["admin", "gestionnaire"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" />
+      </svg>
+    ),
+  },
+  {
+    href: "/clients",
+    label: "Clients",
+    countKey: "clients",
+    roles: ["admin", "gestionnaire"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+      </svg>
+    ),
+  },
+  {
+    href: "/avis",
+    label: "Avis",
+    countKey: "avis",
+    roles: ["support"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 17.3 6.2 20.5l1.1-6.5-4.7-4.6 6.5-.9L12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z" />
+      </svg>
+    ),
+  },
+];
+
+// Set up once, revisited occasionally — tucked behind a disclosure so the
+// primary list stays short and the sidebar never outgrows the viewport.
+const SECONDARY_NAV_ITEMS: NavItem[] = [
+  {
     href: "/marques",
     label: "Marques",
     countKey: "marques",
@@ -59,21 +101,10 @@ const NAV_ITEMS: {
     ),
   },
   {
-    href: "/produits",
-    label: "Produits",
-    countKey: "produits",
-    roles: ["admin", "gestionnaire"],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" />
-      </svg>
-    ),
-  },
-  {
     href: "/avis",
     label: "Avis",
     countKey: "avis",
-    roles: ["admin", "support"],
+    roles: ["admin"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 17.3 6.2 20.5l1.1-6.5-4.7-4.6 6.5-.9L12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z" />
@@ -97,17 +128,6 @@ const NAV_ITEMS: {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 15l5-5 4 4 5-6 4 5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/clients",
-    label: "Clients",
-    countKey: "clients",
-    roles: ["admin", "gestionnaire"],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
       </svg>
     ),
   },
@@ -142,7 +162,14 @@ export function AdminLayout({
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
   const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0, avis: 0 });
   const role = (user?.role ?? "support") as NavRole;
-  const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const primaryItems = PRIMARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const secondaryItems = SECONDARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const secondaryHasActive = secondaryItems.some((item) => location.pathname.startsWith(item.href));
+  const [secondaryOpen, setSecondaryOpen] = useState(secondaryHasActive);
+
+  useEffect(() => {
+    if (secondaryHasActive) setSecondaryOpen(true);
+  }, [secondaryHasActive]);
 
   useEffect(() => {
     apiFetch<unknown[]>("/admin/orders")
@@ -177,36 +204,58 @@ export function AdminLayout({
           <div><div className="name">Blacklines</div><div className="tag">Espace admin</div></div>
         </div>
 
-        <div className="nav-group">
-          <div className="nav-label">Général</div>
-          {visibleNavItems.map((item) => (
-            <Link
-              key={item.href}
-              className={`nav-item${location.pathname === item.href ? " active" : ""}`}
-              to={item.href}
-            >
-              {item.icon}
-              {item.label}
-              {item.countKey ? <span className="count">{counts[item.countKey] ?? 0}</span> : null}
-            </Link>
-          ))}
-        </div>
+        <div className="nav-scroll">
+          <div className="nav-group">
+            <div className="nav-label">Général</div>
+            {primaryItems.map((item) => (
+              <Link
+                key={item.href}
+                className={`nav-item${location.pathname === item.href ? " active" : ""}`}
+                to={item.href}
+              >
+                {item.icon}
+                {item.label}
+                {item.countKey ? <span className="count">{counts[item.countKey] ?? 0}</span> : null}
+              </Link>
+            ))}
+          </div>
 
-        <div className="nav-group">
-          <div className="nav-label">Boutique</div>
-          <a className="nav-item" href="http://localhost:3000" target="_blank" rel="noreferrer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14L21 3" />
-            </svg>
-            Voir la boutique
-          </a>
-          <a className="nav-item" href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-            </svg>
-            Paramètres
-          </a>
+          {secondaryItems.length ? (
+            <div className="nav-group">
+              <button
+                type="button"
+                className={`nav-more${secondaryOpen ? " open" : ""}`}
+                onClick={() => setSecondaryOpen((v) => !v)}
+                aria-expanded={secondaryOpen}
+              >
+                Plus
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+              </button>
+              {secondaryOpen
+                ? secondaryItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      className={`nav-item${location.pathname === item.href ? " active" : ""}`}
+                      to={item.href}
+                    >
+                      {item.icon}
+                      {item.label}
+                      {item.countKey ? <span className="count">{counts[item.countKey] ?? 0}</span> : null}
+                    </Link>
+                  ))
+                : null}
+            </div>
+          ) : null}
+
+          <div className="nav-group">
+            <div className="nav-label">Boutique</div>
+            <a className="nav-item" href="http://localhost:3000" target="_blank" rel="noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14L21 3" />
+              </svg>
+              Voir la boutique
+            </a>
+          </div>
         </div>
 
         <div className="sidebar-footer">
