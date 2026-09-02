@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
 
@@ -32,9 +32,15 @@ interface BrandListItem {
 
 export default function MarqueDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [brand, setBrand] = useState<BrandDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const [editNom, setEditNom] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [newCategory, setNewCategory] = useState("");
   const [newSizeLabel, setNewSizeLabel] = useState("");
@@ -53,13 +59,47 @@ export default function MarqueDetail() {
         return apiFetch<BrandDetail>(`/brands/${match.slug}`);
       })
       .then((detail) => {
-        if (detail) setBrand(detail);
+        if (detail) {
+          setBrand(detail);
+          setEditNom(detail.nom);
+          setEditDescription(detail.description ?? "");
+        }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, [id]);
+
+  async function saveInfo(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingInfo(true);
+
+    try {
+      await apiFetch(`/admin/brands/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ nom: editNom, description: editDescription || null }),
+      });
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
+    } finally {
+      setSavingInfo(false);
+    }
+  }
+
+  async function deleteBrand() {
+    if (!confirm(`Supprimer définitivement la marque "${brand?.nom}" ? Cette action est impossible si des produits, catégories ou tailles y sont encore rattachés.`)) return;
+
+    setDeleting(true);
+    try {
+      await apiFetch(`/admin/brands/${id}`, { method: "DELETE" });
+      navigate("/marques");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Échec de la suppression");
+      setDeleting(false);
+    }
+  }
 
   async function addCategory(e: React.FormEvent) {
     e.preventDefault();
@@ -139,6 +179,34 @@ export default function MarqueDetail() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
         Retour aux marques
       </a>
+
+      <div className="panel" style={{ marginBottom: 20 }}>
+        <div className="panel-head">
+          <div><h3>Informations</h3><div className="sub">Nom et description affichés sur le site</div></div>
+        </div>
+        <div className="panel-body">
+          <form onSubmit={saveInfo}>
+            <div className="form-grid">
+              <div className="field full">
+                <label>Nom</label>
+                <input type="text" value={editNom} onChange={(e) => setEditNom(e.target.value)} required />
+              </div>
+              <div className="field full">
+                <label>Description</label>
+                <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-primary" type="submit" disabled={savingInfo}>
+                {savingInfo ? "Enregistrement..." : "Enregistrer"}
+              </button>
+              <button className="btn btn-outline" type="button" onClick={deleteBrand} disabled={deleting} style={{ color: "var(--danger)" }}>
+                {deleting ? "Suppression..." : "Supprimer la marque"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <div className="detail-grid">
         <div className="panel">
