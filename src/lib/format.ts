@@ -29,6 +29,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   support: "Support",
 };
 
+export function homeRouteForRole(role: UserRole): string {
+  return role === "support" ? "/avis" : "/dashboard";
+}
+
 export function brandTagClass(slug: string): string {
   if (slug === "capsule-textile") return "capsule";
   if (slug === "spicysoul") return "spicy";

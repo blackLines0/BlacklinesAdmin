@@ -9,15 +9,24 @@ const ROLE_LABELS: Record<string, string> = {
   support: "Support",
 };
 
+type NavRole = "admin" | "gestionnaire" | "support";
+
 function initialsOf(nom: string): string {
   const parts = nom.trim().split(/\s+/);
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: {
+  href: string;
+  label: string;
+  countKey?: string;
+  roles: NavRole[];
+  icon: ReactNode;
+}[] = [
   {
     href: "/dashboard",
     label: "Tableau de bord",
+    roles: ["admin", "gestionnaire"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" />
@@ -29,6 +38,7 @@ const NAV_ITEMS = [
     href: "/commandes",
     label: "Commandes",
     countKey: "commandes",
+    roles: ["admin", "gestionnaire", "support"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 8H6" />
@@ -40,6 +50,7 @@ const NAV_ITEMS = [
     href: "/marques",
     label: "Marques",
     countKey: "marques",
+    roles: ["admin", "gestionnaire"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M20.6 12.3 12.7 4.4a2 2 0 0 0-1.4-.6H5a2 2 0 0 0-2 2v6.3a2 2 0 0 0 .6 1.4l7.9 7.9a2 2 0 0 0 2.8 0l6.3-6.3a2 2 0 0 0 0-2.8Z" />
@@ -51,6 +62,7 @@ const NAV_ITEMS = [
     href: "/produits",
     label: "Produits",
     countKey: "produits",
+    roles: ["admin", "gestionnaire"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" />
@@ -58,9 +70,41 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/avis",
+    label: "Avis",
+    countKey: "avis",
+    roles: ["admin", "support"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 17.3 6.2 20.5l1.1-6.5-4.7-4.6 6.5-.9L12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/codes-promo",
+    label: "Codes promo",
+    roles: ["admin"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 2 2 7v10l10 5 10-5V7z" /><path d="M12 22V12" /><path d="M22 7 12 12 2 7" />
+      </svg>
+    ),
+  },
+  {
+    href: "/vitrine",
+    label: "Vitrine",
+    roles: ["admin"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 15l5-5 4 4 5-6 4 5" />
+      </svg>
+    ),
+  },
+  {
     href: "/clients",
     label: "Clients",
     countKey: "clients",
+    roles: ["admin", "gestionnaire"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
@@ -70,6 +114,7 @@ const NAV_ITEMS = [
   {
     href: "/utilisateurs",
     label: "Utilisateurs",
+    roles: ["admin"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6" />
@@ -95,22 +140,29 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
-  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0, avis: 0 });
+  const role = (user?.role ?? "support") as NavRole;
+  const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   useEffect(() => {
     apiFetch<unknown[]>("/admin/orders")
       .then((data) => setCounts((prev) => ({ ...prev, commandes: data.length })))
       .catch(() => {});
-    apiFetch<unknown[]>("/admin/customers")
-      .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))
+    apiFetch<{ statut: string }[]>("/admin/reviews?statut=en_attente")
+      .then((data) => setCounts((prev) => ({ ...prev, avis: data.length })))
       .catch(() => {});
-    apiFetch<unknown[]>("/brands")
-      .then((data) => setCounts((prev) => ({ ...prev, marques: data.length })))
-      .catch(() => {});
-    apiFetch<unknown[]>("/admin/products")
-      .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))
-      .catch(() => {});
-  }, []);
+    if (role !== "support") {
+      apiFetch<unknown[]>("/admin/customers")
+        .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))
+        .catch(() => {});
+      apiFetch<unknown[]>("/brands")
+        .then((data) => setCounts((prev) => ({ ...prev, marques: data.length })))
+        .catch(() => {});
+      apiFetch<unknown[]>("/admin/products")
+        .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))
+        .catch(() => {});
+    }
+  }, [role]);
 
   function handleLogout() {
     logout();
@@ -127,7 +179,7 @@ export function AdminLayout({
 
         <div className="nav-group">
           <div className="nav-label">Général</div>
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems.map((item) => (
             <Link
               key={item.href}
               className={`nav-item${location.pathname === item.href ? " active" : ""}`}

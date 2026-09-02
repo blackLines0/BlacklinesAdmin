@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { homeRouteForRole } from "../lib/format";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -16,8 +17,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const user = await login(email, password);
+      navigate(homeRouteForRole(user.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Échec de la connexion");
     } finally {

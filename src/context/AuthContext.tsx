@@ -4,7 +4,7 @@ import { clearSession, getSession, login as apiLogin, setSession, type SessionUs
 interface AuthContextValue {
   user: SessionUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<SessionUser>;
   logout: () => void;
 }
 
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = await apiLogin(email, password);
         setSession(session);
         setUser(session.user);
+        return session.user;
       },
       logout() {
         clearSession();
