@@ -15,7 +15,7 @@ interface OrderItem {
   quantite: number;
   prixUnitaire: number;
   product: { nom: string; images: string[]; brand: { slug: string; nom: string } };
-  variant: { taille: string } | null;
+  variant: { sizeOption: { label: string } } | null;
 }
 
 interface Order {
@@ -103,7 +103,7 @@ export default function CommandeDetail() {
                 <div style={{ flex: 1 }}>
                   <div className="cell-primary">{item.product.nom}</div>
                   <div className="cell-muted" style={{ fontSize: 12 }}>
-                    {item.product.brand.nom}{item.variant ? ` · Taille ${item.variant.taille}` : ""} · Qté {item.quantite}
+                    {item.product.brand.nom}{item.variant ? ` · Taille ${item.variant.sizeOption.label}` : ""} · Qté {item.quantite}
                   </div>
                 </div>
                 <div className="cell-primary">{formatPrice(item.prixUnitaire * item.quantite)}</div>

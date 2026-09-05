@@ -7,10 +7,11 @@ interface DashboardData {
   chiffreAffaires: number;
   commandesCount: number;
   panierMoyen: number;
+  parCanal: { enLigne: number; boutique: number };
   ventesParMarque: { slug: string; nom: string; pct: number }[];
   topProducts: { nom: string; ventes: number; montant: number; image: string | null }[];
   salesLast7Days: { label: string; total: number }[];
-  recentOrders: { id: string; client: string; montant: number; statut: OrderStatus; brand: string | null; brandNom: string | null }[];
+  recentOrders: { id: string; client: string; montant: number; statut: OrderStatus; canal: "en_ligne" | "boutique"; brand: string | null; brandNom: string | null }[];
 }
 
 const BRAND_COLORS: Record<string, string> = {
@@ -68,6 +69,10 @@ export default function Dashboard() {
             <div className="kpi-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div>
           </div>
           <div className="kpi-value">{formatPrice(data.chiffreAffaires)}</div>
+          <div className="kpi-split">
+            <span>En ligne <strong>{formatPrice(data.parCanal.enLigne)}</strong></span>
+            <span>Boutique <strong>{formatPrice(data.parCanal.boutique)}</strong></span>
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top">
@@ -150,19 +155,20 @@ export default function Dashboard() {
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Commande</th><th>Client</th><th>Marque</th><th>Montant</th><th>Statut</th></tr></thead>
+              <thead><tr><th>Commande</th><th>Client</th><th>Marque</th><th>Canal</th><th>Montant</th><th>Statut</th></tr></thead>
               <tbody>
                 {data.recentOrders.map((order) => (
                   <tr key={order.id}>
                     <td className="cell-primary">#{order.id.slice(-6).toUpperCase()}</td>
                     <td>{order.client}</td>
                     <td>{order.brand ? <span className={`brand-tag ${brandTagClass(order.brand)}`}>{order.brandNom}</span> : "—"}</td>
+                    <td><span className={`badge ${order.canal === "boutique" ? "info" : "neutral"}`}>{order.canal === "boutique" ? "Boutique" : "En ligne"}</span></td>
                     <td>{formatPrice(order.montant)}</td>
                     <td><span className={`badge ${statusBadgeClass(order.statut)}`}>{ORDER_STATUS_LABELS[order.statut]}</span></td>
                   </tr>
                 ))}
                 {data.recentOrders.length === 0 ? (
-                  <tr><td colSpan={5} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune commande</td></tr>
+                  <tr><td colSpan={6} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune commande</td></tr>
                 ) : null}
               </tbody>
             </table>

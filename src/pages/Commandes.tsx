@@ -22,10 +22,16 @@ interface Order {
   statut: OrderStatus;
   montantTotal: number;
   moyenPaiement: string;
+  canal: "en_ligne" | "boutique";
   createdAt: string;
   customer: { nom: string };
   items: OrderItem[];
 }
+
+const CANAL_LABELS: Record<Order["canal"], string> = {
+  en_ligne: "En ligne",
+  boutique: "Boutique",
+};
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
 const STATUS_BG: Record<OrderStatus, string> = {
@@ -48,6 +54,7 @@ export default function Commandes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<OrderStatus | "all">("all");
+  const [canalTab, setCanalTab] = useState<Order["canal"] | "all">("all");
 
   useEffect(() => {
     apiFetch<Order[]>("/admin/orders")
@@ -62,7 +69,9 @@ export default function Commandes() {
     return c;
   }, [orders]);
 
-  const filtered = tab === "all" ? orders : orders.filter((o) => o.statut === tab);
+  const filtered = orders
+    .filter((o) => tab === "all" || o.statut === tab)
+    .filter((o) => canalTab === "all" || o.canal === canalTab);
 
   async function updateStatus(id: string, statut: OrderStatus) {
     const previous = orders;
@@ -110,6 +119,12 @@ export default function Commandes() {
               </span>
             ))}
           </div>
+          <div className="spacer" />
+          <select className="select-sm" value={canalTab} onChange={(e) => setCanalTab(e.target.value as Order["canal"] | "all")}>
+            <option value="all">Canal : Tous</option>
+            <option value="en_ligne">{CANAL_LABELS.en_ligne}</option>
+            <option value="boutique">{CANAL_LABELS.boutique}</option>
+          </select>
         </div>
 
         {loading ? (
@@ -125,6 +140,7 @@ export default function Commandes() {
                   <th>Client</th>
                   <th>Date</th>
                   <th>Marque</th>
+                  <th>Canal</th>
                   <th>Paiement</th>
                   <th>Montant</th>
                   <th>Statut</th>
@@ -140,6 +156,11 @@ export default function Commandes() {
                       <td>{order.customer.nom}</td>
                       <td className="cell-muted">{formatDate(order.createdAt)}</td>
                       <td>{brand ? <span className={`brand-tag ${brandTagClass(brand.slug)}`}>{brand.nom}</span> : "—"}</td>
+                      <td>
+                        <span className={`badge ${order.canal === "boutique" ? "info" : "neutral"}`}>
+                          {CANAL_LABELS[order.canal]}
+                        </span>
+                      </td>
                       <td className="cell-muted">{order.moyenPaiement}</td>
                       <td className="cell-primary">{formatPrice(order.montantTotal)}</td>
                       <td>
@@ -169,7 +190,7 @@ export default function Commandes() {
                   );
                 })}
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={8} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune commande</td></tr>
+                  <tr><td colSpan={9} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune commande</td></tr>
                 ) : null}
               </tbody>
             </table>

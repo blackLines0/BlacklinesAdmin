@@ -39,6 +39,18 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/ventes",
+    label: "Ventes",
+    countKey: "ventes",
+    roles: ["admin", "gestionnaire"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="2" y="7" width="20" height="13" rx="2" /><path d="M2 10h20" />
+        <path d="M7 15h4" /><circle cx="17" cy="15.5" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
     href: "/commandes",
     label: "Commandes",
     countKey: "commandes",
@@ -160,7 +172,7 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
-  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0, avis: 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0, avis: 0, ventes: 0 });
   const role = (user?.role ?? "support") as NavRole;
   const primaryItems = PRIMARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
   const secondaryItems = SECONDARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
@@ -178,6 +190,11 @@ export function AdminLayout({
     apiFetch<{ statut: string }[]>("/admin/reviews?statut=en_attente")
       .then((data) => setCounts((prev) => ({ ...prev, avis: data.length })))
       .catch(() => {});
+    if (role !== "support") {
+      apiFetch<unknown[]>("/admin/orders?canal=boutique")
+        .then((data) => setCounts((prev) => ({ ...prev, ventes: data.length })))
+        .catch(() => {});
+    }
     if (role !== "support") {
       apiFetch<unknown[]>("/admin/customers")
         .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))

@@ -13,6 +13,7 @@ import Marques from "./pages/Marques";
 import Produits from "./pages/Produits";
 import ProduitForm from "./pages/ProduitForm";
 import Utilisateurs from "./pages/Utilisateurs";
+import Ventes from "./pages/Ventes";
 import Vitrine from "./pages/Vitrine";
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
       <Route path="/produits" element={<ProtectedRoute roles={["admin", "gestionnaire"]}><Produits /></ProtectedRoute>} />
       <Route path="/produits/nouveau" element={<ProtectedRoute roles={["admin", "gestionnaire"]}><ProduitForm /></ProtectedRoute>} />
       <Route path="/produits/:id/modifier" element={<ProtectedRoute roles={["admin", "gestionnaire"]}><ProduitForm /></ProtectedRoute>} />
+      <Route path="/ventes" element={<ProtectedRoute roles={["admin", "gestionnaire"]}><Ventes /></ProtectedRoute>} />
       <Route path="/commandes" element={<ProtectedRoute><Commandes /></ProtectedRoute>} />
       <Route path="/commandes/:id" element={<ProtectedRoute><CommandeDetail /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute roles={["admin", "gestionnaire"]}><Clients /></ProtectedRoute>} />
