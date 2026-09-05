@@ -1,7 +1,9 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 
 interface Category {
   id: string;
@@ -33,131 +35,132 @@ interface BrandListItem {
 export default function MarqueDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [brand, setBrand] = useState<BrandDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: brandsList } = useQuery({
+    queryKey: queryKeys.brands,
+    queryFn: () => apiFetch<BrandListItem[]>("/brands"),
+  });
+  const slug = brandsList?.find((b) => b.id === id)?.slug;
+  const notFoundInList = Boolean(brandsList && id && !slug);
+
+  const { data: brand, isLoading: loading, isError } = useQuery({
+    queryKey: queryKeys.brandDetail(slug ?? ""),
+    queryFn: () => apiFetch<BrandDetail>(`/brands/${slug}`),
+    enabled: Boolean(slug),
+  });
 
   const [editNom, setEditNom] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [savingInfo, setSavingInfo] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
   const [newCategory, setNewCategory] = useState("");
   const [newSizeLabel, setNewSizeLabel] = useState("");
   const [newSizeDescription, setNewSizeDescription] = useState("");
 
-  function load() {
-    if (!id) return;
-    setLoading(true);
-    apiFetch<BrandListItem[]>("/brands")
-      .then((brands) => {
-        const match = brands.find((b) => b.id === id);
-        if (!match) {
-          setNotFound(true);
-          return null;
-        }
-        return apiFetch<BrandDetail>(`/brands/${match.slug}`);
-      })
-      .then((detail) => {
-        if (detail) {
-          setBrand(detail);
-          setEditNom(detail.nom);
-          setEditDescription(detail.description ?? "");
-        }
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+  useEffect(() => {
+    if (brand) {
+      setEditNom(brand.nom);
+      setEditDescription(brand.description ?? "");
+    }
+  }, [brand]);
+
+  function invalidateBrand() {
+    if (slug) queryClient.invalidateQueries({ queryKey: queryKeys.brandDetail(slug) });
   }
 
-  useEffect(load, [id]);
-
-  async function saveInfo(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingInfo(true);
-
-    try {
-      await apiFetch(`/admin/brands/${id}`, {
+  const saveInfo = useMutation({
+    mutationFn: () =>
+      apiFetch(`/admin/brands/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ nom: editNom, description: editDescription || null }),
-      });
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    } finally {
-      setSavingInfo(false);
-    }
-  }
+      }),
+    onSuccess: () => {
+      invalidateBrand();
+      queryClient.invalidateQueries({ queryKey: queryKeys.brands });
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la mise à jour"),
+  });
 
-  async function deleteBrand() {
-    if (!confirm(`Supprimer définitivement la marque "${brand?.nom}" ? Cette action est impossible si des produits, catégories ou tailles y sont encore rattachés.`)) return;
-
-    setDeleting(true);
-    try {
-      await apiFetch(`/admin/brands/${id}`, { method: "DELETE" });
+  const deleteBrand = useMutation({
+    mutationFn: () => apiFetch(`/admin/brands/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.brands });
       navigate("/marques");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-      setDeleting(false);
-    }
-  }
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
 
-  async function addCategory(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newCategory.trim()) return;
-
-    try {
-      await apiFetch(`/admin/brands/${id}/categories`, { method: "POST", body: JSON.stringify({ nom: newCategory }) });
+  const addCategory = useMutation({
+    mutationFn: () => apiFetch(`/admin/brands/${id}/categories`, { method: "POST", body: JSON.stringify({ nom: newCategory }) }),
+    onSuccess: () => {
       setNewCategory("");
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de l'ajout");
-    }
-  }
+      invalidateBrand();
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de l'ajout"),
+  });
 
-  async function removeCategory(categoryId: string) {
-    if (!confirm("Supprimer cette catégorie ?")) return;
+  const removeCategory = useMutation({
+    mutationFn: (categoryId: string) => apiFetch(`/admin/categories/${categoryId}`, { method: "DELETE" }),
+    onSuccess: invalidateBrand,
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
 
-    try {
-      await apiFetch(`/admin/categories/${categoryId}`, { method: "DELETE" });
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
-  }
-
-  async function addSizeOption(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newSizeLabel.trim()) return;
-
-    try {
-      await apiFetch(`/admin/brands/${id}/size-options`, {
+  const addSizeOption = useMutation({
+    mutationFn: () =>
+      apiFetch(`/admin/brands/${id}/size-options`, {
         method: "POST",
         body: JSON.stringify({
           label: newSizeLabel,
           description: newSizeDescription || undefined,
           ordre: brand?.sizeOptions.length ?? 0,
         }),
-      });
+      }),
+    onSuccess: () => {
       setNewSizeLabel("");
       setNewSizeDescription("");
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de l'ajout");
-    }
+      invalidateBrand();
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de l'ajout"),
+  });
+
+  const removeSizeOption = useMutation({
+    mutationFn: (sizeId: string) => apiFetch(`/admin/size-options/${sizeId}`, { method: "DELETE" }),
+    onSuccess: invalidateBrand,
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
+
+  function handleSaveInfo(e: React.FormEvent) {
+    e.preventDefault();
+    saveInfo.mutate();
   }
 
-  async function removeSizeOption(sizeId: string) {
+  function handleDeleteBrand() {
+    if (!confirm(`Supprimer définitivement la marque "${brand?.nom}" ? Cette action est impossible si des produits, catégories ou tailles y sont encore rattachés.`)) return;
+    deleteBrand.mutate();
+  }
+
+  function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCategory.trim()) return;
+    addCategory.mutate();
+  }
+
+  function handleRemoveCategory(categoryId: string) {
+    if (!confirm("Supprimer cette catégorie ?")) return;
+    removeCategory.mutate(categoryId);
+  }
+
+  function handleAddSizeOption(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSizeLabel.trim()) return;
+    addSizeOption.mutate();
+  }
+
+  function handleRemoveSizeOption(sizeId: string) {
     if (!confirm("Supprimer cette taille ?")) return;
-
-    try {
-      await apiFetch(`/admin/size-options/${sizeId}`, { method: "DELETE" });
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
+    removeSizeOption.mutate(sizeId);
   }
 
-  if (loading) {
+  if (loading && !notFoundInList) {
     return (
       <AdminLayout title="Marque" crumb="">
         <p className="cell-muted">Chargement...</p>
@@ -165,7 +168,7 @@ export default function MarqueDetail() {
     );
   }
 
-  if (notFound || !brand) {
+  if (notFoundInList || isError || !brand) {
     return (
       <AdminLayout title="Marque introuvable" crumb="">
         <p className="cell-muted">Aucune marque ne correspond à cet identifiant.</p>
@@ -185,7 +188,7 @@ export default function MarqueDetail() {
           <div><h3>Informations</h3><div className="sub">Nom et description affichés sur le site</div></div>
         </div>
         <div className="panel-body">
-          <form onSubmit={saveInfo}>
+          <form onSubmit={handleSaveInfo}>
             <div className="form-grid">
               <div className="field full">
                 <label>Nom</label>
@@ -197,11 +200,11 @@ export default function MarqueDetail() {
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn-primary" type="submit" disabled={savingInfo}>
-                {savingInfo ? "Enregistrement..." : "Enregistrer"}
+              <button className="btn btn-primary" type="submit" disabled={saveInfo.isPending}>
+                {saveInfo.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
-              <button className="btn btn-outline" type="button" onClick={deleteBrand} disabled={deleting} style={{ color: "var(--danger)" }}>
-                {deleting ? "Suppression..." : "Supprimer la marque"}
+              <button className="btn btn-outline" type="button" onClick={handleDeleteBrand} disabled={deleteBrand.isPending} style={{ color: "var(--danger)" }}>
+                {deleteBrand.isPending ? "Suppression..." : "Supprimer la marque"}
               </button>
             </div>
           </form>
@@ -221,14 +224,14 @@ export default function MarqueDetail() {
                 {brand.categories.map((c) => (
                   <div key={c.id} className="detail-row">
                     <span className="value">{c.nom}</span>
-                    <button className="icon-action" aria-label="Supprimer" onClick={() => removeCategory(c.id)}>
+                    <button className="icon-action" aria-label="Supprimer" onClick={() => handleRemoveCategory(c.id)}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                     </button>
                   </div>
                 ))}
               </div>
             )}
-            <form onSubmit={addCategory} style={{ display: "flex", gap: 10 }}>
+            <form onSubmit={handleAddCategory} style={{ display: "flex", gap: 10 }}>
               <input className="text-input" type="text" placeholder="Nouvelle catégorie (ex. Chemises)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ flex: 1 }} />
               <button className="btn btn-outline" type="submit">Ajouter</button>
             </form>
@@ -247,14 +250,14 @@ export default function MarqueDetail() {
                 {brand.sizeOptions.map((s) => (
                   <div key={s.id} className="detail-row">
                     <span className="value">{s.label}{s.description ? <span className="cell-muted" style={{ fontWeight: 400, marginLeft: 8 }}>{s.description}</span> : null}</span>
-                    <button className="icon-action" aria-label="Supprimer" onClick={() => removeSizeOption(s.id)}>
+                    <button className="icon-action" aria-label="Supprimer" onClick={() => handleRemoveSizeOption(s.id)}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                     </button>
                   </div>
                 ))}
               </div>
             )}
-            <form onSubmit={addSizeOption} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <form onSubmit={handleAddSizeOption} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <input className="text-input" type="text" placeholder="Label (ex. X1, M, 50ml...)" value={newSizeLabel} onChange={(e) => setNewSizeLabel(e.target.value)} />
               <input className="text-input" type="text" placeholder="Guide (ex. 2m² — 1m de largeur x 3m de longueur)" value={newSizeDescription} onChange={(e) => setNewSizeDescription(e.target.value)} />
               <button className="btn btn-outline" type="submit">Ajouter la taille</button>

@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, selectOptions } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import {
   avatarColor,
   formatDate,
@@ -46,10 +48,18 @@ const PERMISSIONS = [
 ];
 
 export default function Utilisateurs() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [usersQuery, brandsQuery] = useQueries({
+    queries: [
+      { queryKey: queryKeys.users, queryFn: () => apiFetch<User[]>("/admin/users") },
+      { queryKey: queryKeys.brands, queryFn: () => apiFetch<Brand[]>("/brands") },
+    ],
+  });
+  const users = usersQuery.data ?? [];
+  const brands = brandsQuery.data ?? [];
+  const loading = usersQuery.isLoading;
+  const error = usersQuery.error;
+
   const [tab, setTab] = useState<UserRole | "all">("all");
   const [showInvite, setShowInvite] = useState(false);
 
@@ -57,48 +67,35 @@ export default function Utilisateurs() {
   const [inviteNom, setInviteNom] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("gestionnaire");
   const [inviteBrands, setInviteBrands] = useState<string[]>([]);
-  const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
 
-  function loadUsers() {
-    setLoading(true);
-    apiFetch<User[]>("/admin/users")
-      .then(setUsers)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    loadUsers();
-    apiFetch<Brand[]>("/brands").then(setBrands).catch(() => {});
-  }, []);
-
   const filtered = tab === "all" ? users : users.filter((u) => u.role === tab);
 
-  async function updateRole(id: string, role: UserRole) {
-    const previous = users;
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
-
-    try {
-      await apiFetch(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ role }) });
-    } catch (err) {
-      setUsers(previous);
+  const updateRole = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: UserRole }) =>
+      apiFetch(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+    onMutate: async ({ id, role }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.users });
+      const previous = queryClient.getQueryData<User[]>(queryKeys.users);
+      queryClient.setQueryData<User[]>(queryKeys.users, (prev) =>
+        prev?.map((u) => (u.id === id ? { ...u, role } : u)),
+      );
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.users, context.previous);
       alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    }
-  }
+    },
+  });
 
   function toggleInviteBrand(slug: string) {
     setInviteBrands((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   }
 
-  async function handleInvite(e: React.FormEvent) {
-    e.preventDefault();
-    setInviteError(null);
-    setInviting(true);
-
-    try {
-      const result = await apiFetch<{ user: User; tempPassword: string }>("/admin/users", {
+  const invite = useMutation({
+    mutationFn: () =>
+      apiFetch<{ user: User; tempPassword: string }>("/admin/users", {
         method: "POST",
         body: JSON.stringify({
           email: inviteEmail,
@@ -106,19 +103,22 @@ export default function Utilisateurs() {
           role: inviteRole,
           accesMarques: inviteBrands,
         }),
-      });
-
+      }),
+    onSuccess: (result) => {
       setInviteResult({ email: result.user.email, tempPassword: result.tempPassword });
       setInviteEmail("");
       setInviteNom("");
       setInviteRole("gestionnaire");
       setInviteBrands([]);
-      loadUsers();
-    } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Échec de l'invitation");
-    } finally {
-      setInviting(false);
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.users });
+    },
+    onError: (err) => setInviteError(err instanceof Error ? err.message : "Échec de l'invitation"),
+  });
+
+  function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviteError(null);
+    invite.mutate();
   }
 
   function closeInvite() {
@@ -189,8 +189,8 @@ export default function Utilisateurs() {
                 {inviteError ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{inviteError}</p> : null}
 
                 <div className="form-actions">
-                  <button className="btn btn-primary" type="submit" disabled={inviting}>
-                    {inviting ? "Envoi..." : "Créer le compte"}
+                  <button className="btn btn-primary" type="submit" disabled={invite.isPending}>
+                    {invite.isPending ? "Envoi..." : "Créer le compte"}
                   </button>
                   <button className="btn btn-outline" type="button" onClick={closeInvite}>Annuler</button>
                 </div>
@@ -219,7 +219,7 @@ export default function Utilisateurs() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -242,7 +242,7 @@ export default function Utilisateurs() {
                       </div>
                     </td>
                     <td>
-                      <Select size="sm" value={user.role} onChange={(v) => updateRole(user.id, v as UserRole)} options={ROLE_SELECT_OPTIONS} />
+                      <Select size="sm" value={user.role} onChange={(v) => updateRole.mutate({ id: user.id, role: v as UserRole })} options={ROLE_SELECT_OPTIONS} />
                     </td>
                     <td className="cell-muted">{user.accesMarques.length ? user.accesMarques.join(", ") : "Aucune"}</td>
                     <td className="cell-muted">{formatDate(user.createdAt)}</td>

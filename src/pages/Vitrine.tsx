@@ -1,6 +1,8 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch, uploadImage } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 
 interface HeroSlide {
   id: string;
@@ -21,8 +23,16 @@ interface Announcement {
 }
 
 export default function Vitrine() {
-  const [slides, setSlides] = useState<HeroSlide[]>([]);
-  const [loadingSlides, setLoadingSlides] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: slides = [], isLoading: loadingSlides } = useQuery({
+    queryKey: queryKeys.heroSlides,
+    queryFn: () => apiFetch<HeroSlide[]>("/admin/hero-slides"),
+  });
+  const { data: announcement } = useQuery({
+    queryKey: queryKeys.announcement,
+    queryFn: () => apiFetch<Announcement | null>("/admin/announcement"),
+  });
+
   const [uploading, setUploading] = useState(false);
 
   const [titre, setTitre] = useState("");
@@ -34,26 +44,29 @@ export default function Vitrine() {
   const [codePromo, setCodePromo] = useState("");
   const [dateFin, setDateFin] = useState("");
   const [actif, setActif] = useState(false);
-  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
-
-  function loadSlides() {
-    setLoadingSlides(true);
-    apiFetch<HeroSlide[]>("/admin/hero-slides")
-      .then(setSlides)
-      .finally(() => setLoadingSlides(false));
-  }
 
   useEffect(() => {
-    loadSlides();
-    apiFetch<Announcement | null>("/admin/announcement").then((a) => {
-      if (a) {
-        setTexte(a.texte);
-        setCodePromo(a.codePromo ?? "");
-        setDateFin(a.dateFin ? a.dateFin.slice(0, 16) : "");
-        setActif(a.actif);
-      }
-    });
-  }, []);
+    if (!announcement) return;
+    setTexte(announcement.texte);
+    setCodePromo(announcement.codePromo ?? "");
+    setDateFin(announcement.dateFin ? announcement.dateFin.slice(0, 16) : "");
+    setActif(announcement.actif);
+  }, [announcement]);
+
+  const addSlide = useMutation({
+    mutationFn: (image: string) =>
+      apiFetch("/admin/hero-slides", {
+        method: "POST",
+        body: JSON.stringify({ image, titre: titre || undefined, sousTitre: sousTitre || undefined, lien: lien || undefined, ordre: slides.length }),
+      }),
+    onSuccess: () => {
+      setTitre("");
+      setSousTitre("");
+      setLien("");
+      queryClient.invalidateQueries({ queryKey: queryKeys.heroSlides });
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de l'ajout"),
+  });
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -62,14 +75,7 @@ export default function Vitrine() {
     setUploading(true);
     try {
       const { url } = await uploadImage(file);
-      await apiFetch("/admin/hero-slides", {
-        method: "POST",
-        body: JSON.stringify({ image: url, titre: titre || undefined, sousTitre: sousTitre || undefined, lien: lien || undefined, ordre: slides.length }),
-      });
-      setTitre("");
-      setSousTitre("");
-      setLien("");
-      loadSlides();
+      await addSlide.mutateAsync(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Échec de l'ajout");
     } finally {
@@ -78,32 +84,39 @@ export default function Vitrine() {
     }
   }
 
-  async function toggleActif(slide: HeroSlide) {
-    const previous = slides;
-    setSlides((prev) => prev.map((s) => (s.id === slide.id ? { ...s, actif: !s.actif } : s)));
-    try {
-      await apiFetch(`/admin/hero-slides/${slide.id}`, { method: "PATCH", body: JSON.stringify({ actif: !slide.actif }) });
-    } catch (err) {
-      setSlides(previous);
+  const toggleActif = useMutation({
+    mutationFn: (slide: HeroSlide) =>
+      apiFetch(`/admin/hero-slides/${slide.id}`, { method: "PATCH", body: JSON.stringify({ actif: !slide.actif }) }),
+    onMutate: async (slide) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.heroSlides });
+      const previous = queryClient.getQueryData<HeroSlide[]>(queryKeys.heroSlides);
+      queryClient.setQueryData<HeroSlide[]>(queryKeys.heroSlides, (prev) =>
+        prev?.map((s) => (s.id === slide.id ? { ...s, actif: !s.actif } : s)),
+      );
+      return { previous };
+    },
+    onError: (err, _slide, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.heroSlides, context.previous);
       alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    }
-  }
+    },
+  });
 
-  async function removeSlide(id: string) {
+  const removeSlide = useMutation({
+    mutationFn: (id: string) => apiFetch(`/admin/hero-slides/${id}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<HeroSlide[]>(queryKeys.heroSlides, (prev) => prev?.filter((s) => s.id !== id));
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
+
+  function handleRemoveSlide(id: string) {
     if (!confirm("Supprimer cette image du hero ?")) return;
-    try {
-      await apiFetch(`/admin/hero-slides/${id}`, { method: "DELETE" });
-      setSlides((prev) => prev.filter((s) => s.id !== id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
+    removeSlide.mutate(id);
   }
 
-  async function saveAnnouncement(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingAnnouncement(true);
-    try {
-      await apiFetch<Announcement>("/admin/announcement", {
+  const saveAnnouncement = useMutation({
+    mutationFn: () =>
+      apiFetch<Announcement>("/admin/announcement", {
         method: "PUT",
         body: JSON.stringify({
           texte,
@@ -111,12 +124,14 @@ export default function Vitrine() {
           dateFin: dateFin || undefined,
           actif,
         }),
-      });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de l'enregistrement");
-    } finally {
-      setSavingAnnouncement(false);
-    }
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.announcement }),
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de l'enregistrement"),
+  });
+
+  function handleSaveAnnouncement(e: React.FormEvent) {
+    e.preventDefault();
+    saveAnnouncement.mutate();
   }
 
   return (
@@ -140,10 +155,10 @@ export default function Vitrine() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <button className={`badge ${s.actif ? "success" : "neutral"}`} onClick={() => toggleActif(s)} style={{ cursor: "pointer", border: "none" }}>
+                    <button className={`badge ${s.actif ? "success" : "neutral"}`} onClick={() => toggleActif.mutate(s)} style={{ cursor: "pointer", border: "none" }}>
                       {s.actif ? "Actif" : "Inactif"}
                     </button>
-                    <button className="icon-action" aria-label="Supprimer" onClick={() => removeSlide(s.id)}>
+                    <button className="icon-action" aria-label="Supprimer" onClick={() => handleRemoveSlide(s.id)}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                     </button>
                   </div>
@@ -179,7 +194,7 @@ export default function Vitrine() {
           <div><h3>Bannière d&apos;annonce</h3><div className="sub">Le bandeau défilant sous la navigation (promo, code, compte à rebours)</div></div>
         </div>
         <div className="panel-body">
-          <form onSubmit={saveAnnouncement}>
+          <form onSubmit={handleSaveAnnouncement}>
             <div className="form-grid">
               <div className="field full">
                 <label>Texte</label>
@@ -201,8 +216,8 @@ export default function Vitrine() {
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn-primary" type="submit" disabled={savingAnnouncement}>
-                {savingAnnouncement ? "Enregistrement..." : "Enregistrer"}
+              <button className="btn btn-primary" type="submit" disabled={saveAnnouncement.isPending}>
+                {saveAnnouncement.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
           </form>

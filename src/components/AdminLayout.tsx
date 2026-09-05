@@ -1,7 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrateur",
@@ -172,7 +174,6 @@ export function AdminLayout({
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
-  const [counts, setCounts] = useState<Record<string, number>>({ commandes: 0, produits: 0, clients: 0, marques: 0, avis: 0, ventes: 0 });
   const role = (user?.role ?? "support") as NavRole;
   const primaryItems = PRIMARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
   const secondaryItems = SECONDARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
@@ -183,30 +184,40 @@ export function AdminLayout({
     if (secondaryHasActive) setSecondaryOpen(true);
   }, [secondaryHasActive]);
 
-  useEffect(() => {
-    apiFetch<unknown[]>("/admin/orders")
-      .then((data) => setCounts((prev) => ({ ...prev, commandes: data.length })))
-      .catch(() => {});
-    apiFetch<{ statut: string }[]>("/admin/reviews?statut=en_attente")
-      .then((data) => setCounts((prev) => ({ ...prev, avis: data.length })))
-      .catch(() => {});
-    if (role !== "support") {
-      apiFetch<unknown[]>("/admin/orders?canal=boutique")
-        .then((data) => setCounts((prev) => ({ ...prev, ventes: data.length })))
-        .catch(() => {});
-    }
-    if (role !== "support") {
-      apiFetch<unknown[]>("/admin/customers")
-        .then((data) => setCounts((prev) => ({ ...prev, clients: data.length })))
-        .catch(() => {});
-      apiFetch<unknown[]>("/brands")
-        .then((data) => setCounts((prev) => ({ ...prev, marques: data.length })))
-        .catch(() => {});
-      apiFetch<unknown[]>("/admin/products")
-        .then((data) => setCounts((prev) => ({ ...prev, produits: data.length })))
-        .catch(() => {});
-    }
-  }, [role]);
+  // Same query keys as the pages themselves (Commandes, Ventes, Clients,
+  // Marques, Produits, Avis) — these share one cached fetch instead of each
+  // one firing its own request just to compute a badge count.
+  const { data: orders } = useQuery({ queryKey: queryKeys.orders, queryFn: () => apiFetch<unknown[]>("/admin/orders") });
+  const { data: reviews } = useQuery({ queryKey: queryKeys.reviews, queryFn: () => apiFetch<{ statut: string }[]>("/admin/reviews") });
+  const { data: ventesOrders } = useQuery({
+    queryKey: queryKeys.ordersBoutique,
+    queryFn: () => apiFetch<unknown[]>("/admin/orders?canal=boutique"),
+    enabled: role !== "support",
+  });
+  const { data: customers } = useQuery({
+    queryKey: queryKeys.customers,
+    queryFn: () => apiFetch<unknown[]>("/admin/customers"),
+    enabled: role !== "support",
+  });
+  const { data: brands } = useQuery({
+    queryKey: queryKeys.brands,
+    queryFn: () => apiFetch<unknown[]>("/brands"),
+    enabled: role !== "support",
+  });
+  const { data: products } = useQuery({
+    queryKey: queryKeys.products,
+    queryFn: () => apiFetch<unknown[]>("/admin/products"),
+    enabled: role !== "support",
+  });
+
+  const counts: Record<string, number> = {
+    commandes: orders?.length ?? 0,
+    avis: reviews?.filter((r) => r.statut === "en_attente").length ?? 0,
+    ventes: ventesOrders?.length ?? 0,
+    clients: customers?.length ?? 0,
+    marques: brands?.length ?? 0,
+    produits: products?.length ?? 0,
+  };
 
   function handleLogout() {
     logout();

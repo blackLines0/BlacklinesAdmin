@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import {
   brandTagClass,
   formatPrice,
@@ -38,25 +40,19 @@ interface Product {
 }
 
 export default function Produits() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [productsQuery, brandsQuery] = useQueries({
+    queries: [
+      { queryKey: queryKeys.products, queryFn: () => apiFetch<Product[]>("/admin/products") },
+      { queryKey: queryKeys.brands, queryFn: () => apiFetch<Brand[]>("/brands") },
+    ],
+  });
+  const products = productsQuery.data ?? [];
+  const brands = brandsQuery.data ?? [];
+  const loading = productsQuery.isLoading || brandsQuery.isLoading;
+  const error = productsQuery.error ?? brandsQuery.error;
   const [tab, setTab] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
-
-  useEffect(() => {
-    Promise.all([
-      apiFetch<Product[]>("/admin/products"),
-      apiFetch<Brand[]>("/brands"),
-    ])
-      .then(([productsData, brandsData]) => {
-        setProducts(productsData);
-        setBrands(brandsData);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }, []);
 
   const tabs = useMemo(
     () => [
@@ -76,15 +72,17 @@ export default function Produits() {
     return true;
   });
 
-  async function handleDelete(id: string) {
-    if (!confirm("Supprimer ce produit ?")) return;
+  const deleteProduct = useMutation({
+    mutationFn: (id: string) => apiFetch(`/admin/products/${id}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<Product[]>(queryKeys.products, (prev) => prev?.filter((p) => p.id !== id));
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
 
-    try {
-      await apiFetch(`/admin/products/${id}`, { method: "DELETE" });
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
+  function handleDelete(id: string) {
+    if (!confirm("Supprimer ce produit ?")) return;
+    deleteProduct.mutate(id);
   }
 
   return (
@@ -122,7 +120,7 @@ export default function Produits() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>

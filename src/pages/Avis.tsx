@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { formatDate } from "../lib/format";
 
 type ReviewStatus = "en_attente" | "approuve" | "rejete";
@@ -44,47 +46,46 @@ function Stars({ note }: { note: number }) {
 }
 
 export default function Avis() {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: reviews = [], isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.reviews,
+    queryFn: () => apiFetch<Review[]>("/admin/reviews"),
+  });
   const [tab, setTab] = useState<ReviewStatus | "all">("en_attente");
-
-  function load() {
-    setLoading(true);
-    apiFetch<Review[]>("/admin/reviews")
-      .then(setReviews)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(load, []);
 
   const filtered = useMemo(
     () => (tab === "all" ? reviews : reviews.filter((r) => r.statut === tab)),
     [reviews, tab],
   );
 
-  async function setStatut(id: string, statut: ReviewStatus) {
-    const previous = reviews;
-    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, statut } : r)));
-
-    try {
-      await apiFetch(`/admin/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ statut }) });
-    } catch (err) {
-      setReviews(previous);
+  const setStatut = useMutation({
+    mutationFn: ({ id, statut }: { id: string; statut: ReviewStatus }) =>
+      apiFetch(`/admin/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ statut }) }),
+    onMutate: async ({ id, statut }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.reviews });
+      const previous = queryClient.getQueryData<Review[]>(queryKeys.reviews);
+      queryClient.setQueryData<Review[]>(queryKeys.reviews, (prev) =>
+        prev?.map((r) => (r.id === id ? { ...r, statut } : r)),
+      );
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.reviews, context.previous);
       alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    }
-  }
+    },
+  });
 
-  async function remove(id: string) {
+  const removeReview = useMutation({
+    mutationFn: (id: string) => apiFetch(`/admin/reviews/${id}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<Review[]>(queryKeys.reviews, (prev) => prev?.filter((r) => r.id !== id));
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
+
+  function remove(id: string) {
     if (!confirm("Supprimer définitivement cet avis ?")) return;
-
-    try {
-      await apiFetch(`/admin/reviews/${id}`, { method: "DELETE" });
-      setReviews((prev) => prev.filter((r) => r.id !== id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
+    removeReview.mutate(id);
   }
 
   return (
@@ -111,7 +112,7 @@ export default function Avis() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -138,12 +139,12 @@ export default function Avis() {
                     <td>
                       <div style={{ display: "flex", gap: 6 }}>
                         {r.statut !== "approuve" ? (
-                          <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => setStatut(r.id, "approuve")}>
+                          <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => setStatut.mutate({ id: r.id, statut: "approuve" })}>
                             Approuver
                           </button>
                         ) : null}
                         {r.statut !== "rejete" ? (
-                          <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => setStatut(r.id, "rejete")}>
+                          <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => setStatut.mutate({ id: r.id, statut: "rejete" })}>
                             Rejeter
                           </button>
                         ) : null}

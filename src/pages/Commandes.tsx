@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import {
   brandTagClass,
   formatDate,
@@ -48,18 +50,30 @@ const CANAL_SELECT_OPTIONS: SelectOption[] = [
 ];
 
 export default function Commandes() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: orders = [], isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.orders,
+    queryFn: () => apiFetch<Order[]>("/admin/orders"),
+  });
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   const [canalTab, setCanalTab] = useState<Order["canal"] | "all">("all");
 
-  useEffect(() => {
-    apiFetch<Order[]>("/admin/orders")
-      .then(setOrders)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }, []);
+  const updateStatus = useMutation({
+    mutationFn: ({ id, statut }: { id: string; statut: OrderStatus }) =>
+      apiFetch(`/admin/orders/${id}`, { method: "PATCH", body: JSON.stringify({ statut }) }),
+    onMutate: async ({ id, statut }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.orders });
+      const previous = queryClient.getQueryData<Order[]>(queryKeys.orders);
+      queryClient.setQueryData<Order[]>(queryKeys.orders, (prev) =>
+        prev?.map((o) => (o.id === id ? { ...o, statut } : o)),
+      );
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.orders, context.previous);
+      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
+    },
+  });
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { en_attente: 0, payee: 0, expediee: 0, livree: 0, annulee: 0 };
@@ -70,21 +84,6 @@ export default function Commandes() {
   const filtered = orders
     .filter((o) => tab === "all" || o.statut === tab)
     .filter((o) => canalTab === "all" || o.canal === canalTab);
-
-  async function updateStatus(id: string, statut: OrderStatus) {
-    const previous = orders;
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, statut } : o)));
-
-    try {
-      await apiFetch(`/admin/orders/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ statut }),
-      });
-    } catch (err) {
-      setOrders(previous);
-      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    }
-  }
 
   return (
     <AdminLayout title="Commandes" crumb={`${orders.length} commandes au total`} searchPlaceholder="Rechercher une commande...">
@@ -129,7 +128,7 @@ export default function Commandes() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -166,7 +165,7 @@ export default function Commandes() {
                         <Select
                           size="sm"
                           value={order.statut}
-                          onChange={(v) => updateStatus(order.id, v as OrderStatus)}
+                          onChange={(v) => updateStatus.mutate({ id: order.id, statut: v as OrderStatus })}
                           options={STATUS_SELECT_OPTIONS}
                         />
                       </td>

@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 
 interface Brand {
   id: string;
@@ -11,39 +13,29 @@ interface Brand {
 }
 
 export default function Marques() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: brands = [], isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.brands,
+    queryFn: () => apiFetch<Brand[]>("/brands"),
+  });
   const [showCreate, setShowCreate] = useState(false);
   const [nom, setNom] = useState("");
   const [description, setDescription] = useState("");
-  const [creating, setCreating] = useState(false);
 
-  function load() {
-    setLoading(true);
-    apiFetch<Brand[]>("/brands")
-      .then(setBrands)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(load, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreating(true);
-
-    try {
-      await apiFetch("/admin/brands", { method: "POST", body: JSON.stringify({ nom, description: description || undefined }) });
+  const createBrand = useMutation({
+    mutationFn: () => apiFetch("/admin/brands", { method: "POST", body: JSON.stringify({ nom, description: description || undefined }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.brands });
       setNom("");
       setDescription("");
       setShowCreate(false);
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la création");
-    } finally {
-      setCreating(false);
-    }
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la création"),
+  });
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    createBrand.mutate();
   }
 
   return (
@@ -70,8 +62,8 @@ export default function Marques() {
                 </div>
               </div>
               <div className="form-actions">
-                <button className="btn btn-primary" type="submit" disabled={creating}>
-                  {creating ? "Création..." : "Créer la marque"}
+                <button className="btn btn-primary" type="submit" disabled={createBrand.isPending}>
+                  {createBrand.isPending ? "Création..." : "Créer la marque"}
                 </button>
                 <button className="btn btn-outline" type="button" onClick={() => setShowCreate(false)}>Annuler</button>
               </div>
@@ -84,7 +76,7 @@ export default function Marques() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>

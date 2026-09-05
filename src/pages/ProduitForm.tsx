@@ -1,8 +1,10 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select } from "../components/Select";
 import { apiFetch, uploadImage } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 
 interface Brand {
   id: string;
@@ -55,13 +57,9 @@ const STATUS_OPTIONS: { value: Product["statut"]; label: string }[] = [
 export default function ProduitForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(id);
 
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
-  const [loading, setLoading] = useState(isEdit);
-  const [notFound, setNotFound] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [nom, setNom] = useState("");
@@ -81,49 +79,43 @@ export default function ProduitForm() {
   const mainInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    apiFetch<Brand[]>("/brands")
-      .then((data) => {
-        setBrands(data);
-        setBrandId((prev) => prev || data[0]?.id || "");
-      })
-      .catch(() => setError("Impossible de charger les marques"));
-  }, []);
+  const { data: brands = [] } = useQuery({
+    queryKey: queryKeys.brands,
+    queryFn: () => apiFetch<Brand[]>("/brands"),
+  });
 
   useEffect(() => {
-    const brand = brands.find((b) => b.id === brandId);
-    if (!brand) {
-      setBrandDetail(null);
-      return;
-    }
+    if (!isEdit) setBrandId((prev) => prev || brands[0]?.id || "");
+  }, [brands, isEdit]);
 
-    apiFetch<BrandDetail>(`/brands/${brand.slug}`)
-      .then(setBrandDetail)
-      .catch(() => setBrandDetail(null));
-  }, [brandId, brands]);
+  const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
+
+  const { data: brandDetail = null } = useQuery({
+    queryKey: queryKeys.brandDetail(selectedBrandSlug ?? ""),
+    queryFn: () => apiFetch<BrandDetail>(`/brands/${selectedBrandSlug}`),
+    enabled: Boolean(selectedBrandSlug),
+  });
+
+  const { data: existingProduct, isLoading: loadingProduct, isError: notFound } = useQuery({
+    queryKey: queryKeys.product(id ?? ""),
+    queryFn: () => apiFetch<Product>(`/admin/products/${id}`),
+    enabled: isEdit,
+  });
 
   useEffect(() => {
-    if (!id) return;
-
-    apiFetch<Product>(`/admin/products/${id}`)
-      .then((product) => {
-        setNom(product.nom);
-        setBrandId(product.brandId);
-        setCategoryId(product.categoryId ?? "");
-        setPrix(String(product.prix));
-        setPrixPromo(product.prixPromo !== null ? String(product.prixPromo) : "");
-        setStock(String(product.stock));
-        setStatut(product.statut);
-        setDescription(product.description ?? "");
-        setMainImage(product.images[0] ?? null);
-        setGalleryImages(product.images.slice(1));
-        setVariantStocks(
-          Object.fromEntries(product.variants.map((v) => [v.sizeOptionId, String(v.stock)])),
-        );
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [id]);
+    if (!existingProduct) return;
+    setNom(existingProduct.nom);
+    setBrandId(existingProduct.brandId);
+    setCategoryId(existingProduct.categoryId ?? "");
+    setPrix(String(existingProduct.prix));
+    setPrixPromo(existingProduct.prixPromo !== null ? String(existingProduct.prixPromo) : "");
+    setStock(String(existingProduct.stock));
+    setStatut(existingProduct.statut);
+    setDescription(existingProduct.description ?? "");
+    setMainImage(existingProduct.images[0] ?? null);
+    setGalleryImages(existingProduct.images.slice(1));
+    setVariantStocks(Object.fromEntries(existingProduct.variants.map((v) => [v.sizeOptionId, String(v.stock)])));
+  }, [existingProduct]);
 
   function toggleVariant(sizeOptionId: string, checked: boolean) {
     setVariantStocks((prev) => {
@@ -179,18 +171,14 @@ export default function ProduitForm() {
     setGalleryImages((prev) => prev.filter((img) => img !== url));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
+  const submit = useMutation({
+    mutationFn: () => {
+      const images = [mainImage, ...galleryImages].filter((img): img is string => Boolean(img));
+      const variants: ProductVariant[] = Object.entries(variantStocks).map(([sizeOptionId, stockValue]) => ({
+        sizeOptionId,
+        stock: Number(stockValue) || 0,
+      }));
 
-    const images = [mainImage, ...galleryImages].filter((img): img is string => Boolean(img));
-    const variants: ProductVariant[] = Object.entries(variantStocks).map(([sizeOptionId, stockValue]) => ({
-      sizeOptionId,
-      stock: Number(stockValue) || 0,
-    }));
-
-    try {
       const payload = {
         nom,
         brandId,
@@ -204,27 +192,25 @@ export default function ProduitForm() {
         ...(brandDetail?.sizeOptions.length ? { variants } : {}),
       };
 
-      if (isEdit) {
-        await apiFetch(`/admin/products/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await apiFetch("/admin/products", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      }
-
+      return isEdit
+        ? apiFetch(`/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+        : apiFetch("/admin/products", { method: "POST", body: JSON.stringify(payload) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.products });
+      if (id) queryClient.invalidateQueries({ queryKey: queryKeys.product(id) });
       navigate("/produits");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Échec de l'enregistrement");
-    } finally {
-      setSubmitting(false);
-    }
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "Échec de l'enregistrement"),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    submit.mutate();
   }
 
-  if (loading) {
+  if (isEdit && loadingProduct) {
     return (
       <AdminLayout title="Modifier le produit" crumb="">
         <p className="cell-muted">Chargement...</p>
@@ -232,7 +218,7 @@ export default function ProduitForm() {
     );
   }
 
-  if (notFound) {
+  if (isEdit && notFound) {
     return (
       <AdminLayout title="Produit introuvable" crumb="">
         <p className="cell-muted">Aucun produit ne correspond à cet identifiant.</p>
@@ -393,8 +379,8 @@ export default function ProduitForm() {
             {error ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{error}</p> : null}
 
             <div className="form-actions">
-              <button className="btn btn-primary" type="submit" disabled={submitting || uploadingMain || uploadingGallery}>
-                {submitting ? "Enregistrement..." : isEdit ? "Enregistrer les modifications" : "Créer le produit"}
+              <button className="btn btn-primary" type="submit" disabled={submit.isPending || uploadingMain || uploadingGallery}>
+                {submit.isPending ? "Enregistrement..." : isEdit ? "Enregistrer les modifications" : "Créer le produit"}
               </button>
               <button className="btn btn-outline" type="button" onClick={() => navigate("/produits")}>
                 Annuler

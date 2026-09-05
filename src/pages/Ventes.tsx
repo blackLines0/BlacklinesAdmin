@@ -1,8 +1,10 @@
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { Combobox } from "../components/Combobox";
 import { Select } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatDate, formatPrice } from "../lib/format";
 
 interface SizeOption {
@@ -38,9 +40,16 @@ interface VenteOrder {
 const PAIEMENT_OPTIONS = ["Espèces (boutique)", "Mobile Money (boutique)"];
 
 export default function Ventes() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [ventes, setVentes] = useState<VenteOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [productsQuery, ventesQuery] = useQueries({
+    queries: [
+      { queryKey: queryKeys.products, queryFn: () => apiFetch<Product[]>("/admin/products") },
+      { queryKey: queryKeys.ordersBoutique, queryFn: () => apiFetch<VenteOrder[]>("/admin/orders?canal=boutique") },
+    ],
+  });
+  const products = productsQuery.data ?? [];
+  const ventes = ventesQuery.data ?? [];
+  const loading = productsQuery.isLoading;
 
   const [productId, setProductId] = useState("");
   const [variantId, setVariantId] = useState("");
@@ -50,27 +59,13 @@ export default function Ventes() {
   const [showClient, setShowClient] = useState(false);
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedProduct = products.find((p) => p.id === productId) ?? null;
 
-  function loadVentes() {
-    apiFetch<VenteOrder[]>("/admin/orders?canal=boutique")
-      .then(setVentes)
-      .catch(() => setVentes([]));
-  }
-
   useEffect(() => {
-    apiFetch<Product[]>("/admin/products")
-      .then((data) => {
-        setProducts(data);
-        setProductId((prev) => prev || data[0]?.id || "");
-      })
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false));
-    loadVentes();
-  }, []);
+    setProductId((prev) => prev || products[0]?.id || "");
+  }, [products]);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -85,18 +80,9 @@ export default function Ventes() {
     return qty * prix;
   }, [quantite, prixUnitaire]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!productId || !quantite || !prixUnitaire) {
-      setError("Produit, quantité et prix requis.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await apiFetch("/admin/ventes", {
+  const submit = useMutation({
+    mutationFn: () =>
+      apiFetch("/admin/ventes", {
         method: "POST",
         body: JSON.stringify({
           items: [
@@ -112,20 +98,30 @@ export default function Ventes() {
             ? { nom: clientNom || undefined, telephone: clientTelephone || undefined }
             : undefined,
         }),
-      });
-
+      }),
+    onSuccess: () => {
       setQuantite("1");
       setClientNom("");
       setClientTelephone("");
       setShowClient(false);
-      loadVentes();
-      // refresh product stock shown in the select
-      apiFetch<Product[]>("/admin/products").then(setProducts).catch(() => {});
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Échec de l'enregistrement");
-    } finally {
-      setSubmitting(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.ordersBoutique });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "Échec de l'enregistrement"),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!productId || !quantite || !prixUnitaire) {
+      setError("Produit, quantité et prix requis.");
+      return;
     }
+
+    submit.mutate();
   }
 
   return (
@@ -210,8 +206,8 @@ export default function Ventes() {
               {error ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{error}</p> : null}
 
               <div className="form-actions">
-                <button className="btn btn-primary" type="submit" disabled={submitting}>
-                  {submitting ? "Enregistrement..." : "Enregistrer la vente"}
+                <button className="btn btn-primary" type="submit" disabled={submit.isPending}>
+                  {submit.isPending ? "Enregistrement..." : "Enregistrer la vente"}
                 </button>
               </div>
             </form>

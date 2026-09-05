@@ -1,8 +1,10 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import {
   formatDate,
   formatPrice,
@@ -39,40 +41,29 @@ const STATUS_SELECT_OPTIONS: SelectOption[] = STATUS_OPTIONS.map(([value, label]
 export default function CommandeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<Order | null>(null);
+  const queryClient = useQueryClient();
   const [statut, setStatut] = useState<OrderStatus>("en_attente");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [notFound, setNotFound] = useState(false);
+
+  const { data: order, isLoading: loading, isError: notFound } = useQuery({
+    queryKey: queryKeys.order(id!),
+    queryFn: () => apiFetch<Order>(`/admin/orders/${id}`),
+    enabled: Boolean(id),
+  });
 
   useEffect(() => {
-    if (!id) return;
+    if (order) setStatut(order.statut);
+  }, [order]);
 
-    apiFetch<Order>(`/admin/orders/${id}`)
-      .then((data) => {
-        setOrder(data);
-        setStatut(data.statut);
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  async function handleSave() {
-    if (!order) return;
-    setSaving(true);
-
-    try {
-      await apiFetch(`/admin/orders/${order.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ statut }),
-      });
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/admin/orders/${id}`, { method: "PATCH", body: JSON.stringify({ statut }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ordersBoutique });
+      queryClient.invalidateQueries({ queryKey: queryKeys.order(id!) });
       navigate("/commandes");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    } finally {
-      setSaving(false);
-    }
-  }
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la mise à jour"),
+  });
 
   if (loading) {
     return (
@@ -144,8 +135,8 @@ export default function CommandeDetail() {
             </div>
 
             <div className="form-actions">
-              <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? "Enregistrement..." : "Enregistrer"}
+              <button className="btn btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+                {save.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
           </div>

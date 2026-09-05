@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { avatarColor, formatDate, initialsOf } from "../lib/format";
 
 interface Customer {
@@ -15,16 +16,10 @@ interface Customer {
 }
 
 export default function Clients() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<Customer[]>("/admin/customers")
-      .then(setCustomers)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: customers = [], isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.customers,
+    queryFn: () => apiFetch<Customer[]>("/admin/customers"),
+  });
 
   return (
     <AdminLayout title="Clients" crumb={`${customers.length} clients`} searchPlaceholder="Rechercher un client...">
@@ -32,7 +27,7 @@ export default function Clients() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>

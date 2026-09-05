@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatDate, formatPrice, ORDER_STATUS_LABELS, statusBadgeClass, type OrderStatus } from "../lib/format";
 
 interface OrderItem {
@@ -32,17 +33,11 @@ interface CustomerDetail {
 
 export default function ClientDetail() {
   const { id } = useParams();
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-    apiFetch<CustomerDetail>(`/admin/customers/${id}`)
-      .then(setCustomer)
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const { data: customer, isLoading: loading, isError: notFound } = useQuery({
+    queryKey: queryKeys.customer(id ?? ""),
+    queryFn: () => apiFetch<CustomerDetail>(`/admin/customers/${id}`),
+    enabled: Boolean(id),
+  });
 
   if (loading) {
     return (

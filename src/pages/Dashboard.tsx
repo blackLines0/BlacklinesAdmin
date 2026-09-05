@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatPrice, ORDER_STATUS_LABELS, statusBadgeClass, type OrderStatus } from "../lib/format";
 
 interface DashboardData {
@@ -30,16 +31,10 @@ function donutSegments(parts: { pct: number; slug: string }[]) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<DashboardData>("/admin/dashboard")
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.dashboard,
+    queryFn: () => apiFetch<DashboardData>("/admin/dashboard"),
+  });
 
   if (loading) {
     return (
@@ -52,7 +47,7 @@ export default function Dashboard() {
   if (error || !data) {
     return (
       <AdminLayout title="Tableau de bord" crumb="Aperçu des ventes — toutes marques">
-        <p style={{ color: "var(--danger)" }}>{error}</p>
+        <p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p>
       </AdminLayout>
     );
   }

@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { formatDate } from "../lib/format";
 
 const TYPE_OPTIONS = [
@@ -24,9 +26,11 @@ interface PromoCode {
 }
 
 export default function CodesPromo() {
-  const [codes, setCodes] = useState<PromoCode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: codes = [], isLoading: loading, error } = useQuery({
+    queryKey: queryKeys.promoCodes,
+    queryFn: () => apiFetch<PromoCode[]>("/admin/promo-codes"),
+  });
 
   const [code, setCode] = useState("");
   const [type, setType] = useState<"pourcentage" | "montantFixe">("pourcentage");
@@ -35,26 +39,11 @@ export default function CodesPromo() {
   const [dateFin, setDateFin] = useState("");
   const [usageMax, setUsageMax] = useState("");
   const [premierAchatSeulement, setPremierAchatSeulement] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  function load() {
-    setLoading(true);
-    apiFetch<PromoCode[]>("/admin/promo-codes")
-      .then(setCodes)
-      .catch((err) => setError(err instanceof Error ? err.message : "Erreur de chargement"))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(load, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreateError(null);
-    setCreating(true);
-
-    try {
-      await apiFetch("/admin/promo-codes", {
+  const createCode = useMutation({
+    mutationFn: () =>
+      apiFetch("/admin/promo-codes", {
         method: "POST",
         body: JSON.stringify({
           code,
@@ -64,43 +53,52 @@ export default function CodesPromo() {
           usageMax: usageMax ? Number(usageMax) : undefined,
           premierAchatSeulement,
         }),
-      });
-
+      }),
+    onSuccess: () => {
       setCode("");
       setValeur("");
       setDateDebut("");
       setDateFin("");
       setUsageMax("");
       setPremierAchatSeulement(false);
-      load();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Échec de la création");
-    } finally {
-      setCreating(false);
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.promoCodes });
+    },
+    onError: (err) => setCreateError(err instanceof Error ? err.message : "Échec de la création"),
+  });
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    createCode.mutate();
   }
 
-  async function toggleActif(c: PromoCode) {
-    const previous = codes;
-    setCodes((prev) => prev.map((x) => (x.id === c.id ? { ...x, actif: !x.actif } : x)));
-
-    try {
-      await apiFetch(`/admin/promo-codes/${c.id}`, { method: "PATCH", body: JSON.stringify({ actif: !c.actif }) });
-    } catch (err) {
-      setCodes(previous);
+  const toggleActif = useMutation({
+    mutationFn: (c: PromoCode) => apiFetch(`/admin/promo-codes/${c.id}`, { method: "PATCH", body: JSON.stringify({ actif: !c.actif }) }),
+    onMutate: async (c) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.promoCodes });
+      const previous = queryClient.getQueryData<PromoCode[]>(queryKeys.promoCodes);
+      queryClient.setQueryData<PromoCode[]>(queryKeys.promoCodes, (prev) =>
+        prev?.map((x) => (x.id === c.id ? { ...x, actif: !x.actif } : x)),
+      );
+      return { previous };
+    },
+    onError: (err, _c, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.promoCodes, context.previous);
       alert(err instanceof Error ? err.message : "Échec de la mise à jour");
-    }
-  }
+    },
+  });
 
-  async function remove(id: string) {
+  const removeCode = useMutation({
+    mutationFn: (id: string) => apiFetch(`/admin/promo-codes/${id}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<PromoCode[]>(queryKeys.promoCodes, (prev) => prev?.filter((c) => c.id !== id));
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
+  });
+
+  function remove(id: string) {
     if (!confirm("Supprimer ce code promo ?")) return;
-
-    try {
-      await apiFetch(`/admin/promo-codes/${id}`, { method: "DELETE" });
-      setCodes((prev) => prev.filter((c) => c.id !== id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Échec de la suppression");
-    }
+    removeCode.mutate(id);
   }
 
   return (
@@ -147,8 +145,8 @@ export default function CodesPromo() {
             {createError ? <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{createError}</p> : null}
 
             <div className="form-actions">
-              <button className="btn btn-primary" type="submit" disabled={creating}>
-                {creating ? "Création..." : "Créer le code"}
+              <button className="btn btn-primary" type="submit" disabled={createCode.isPending}>
+                {createCode.isPending ? "Création..." : "Créer le code"}
               </button>
             </div>
           </form>
@@ -159,7 +157,7 @@ export default function CodesPromo() {
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
         ) : error ? (
-          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error}</p></div>
+          <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -187,7 +185,7 @@ export default function CodesPromo() {
                     <td className="cell-muted">{c.usageCount}{c.usageMax ? ` / ${c.usageMax}` : ""}</td>
                     <td className="cell-muted">{c.premierAchatSeulement ? "Oui" : "—"}</td>
                     <td>
-                      <button className={`badge ${c.actif ? "success" : "neutral"}`} onClick={() => toggleActif(c)} style={{ cursor: "pointer", border: "none" }}>
+                      <button className={`badge ${c.actif ? "success" : "neutral"}`} onClick={() => toggleActif.mutate(c)} style={{ cursor: "pointer", border: "none" }}>
                         {c.actif ? "Actif" : "Inactif"}
                       </button>
                     </td>
