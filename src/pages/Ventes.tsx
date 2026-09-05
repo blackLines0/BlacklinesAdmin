@@ -4,6 +4,7 @@ import { AdminLayout } from "../components/AdminLayout";
 import { Combobox } from "../components/Combobox";
 import { Select } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { exportToCsv } from "../lib/csvExport";
 import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatDate, formatPrice } from "../lib/format";
 
@@ -124,6 +125,17 @@ export default function Ventes() {
     submit.mutate();
   }
 
+  function handleExport() {
+    exportToCsv("ventes", ventes, [
+      { label: "Date", value: (v) => formatDate(v.createdAt) },
+      { label: "Produit", value: (v) => v.items.map((i) => i.product.nom).join(", ") },
+      { label: "Marque", value: (v) => v.items[0]?.product.brand.nom ?? "" },
+      { label: "Client", value: (v) => v.customer.nom },
+      { label: "Paiement", value: (v) => v.moyenPaiement },
+      { label: "Montant", value: (v) => v.montantTotal },
+    ]);
+  }
+
   return (
     <AdminLayout title="Ventes" crumb={`${ventes.length} ventes en boutique enregistrées`}>
       <div className="panel" style={{ marginBottom: 20 }}>
@@ -218,6 +230,10 @@ export default function Ventes() {
       <div className="panel">
         <div className="panel-head">
           <div><h3>Historique des ventes en boutique</h3></div>
+          <button className="btn btn-outline btn-sm" type="button" onClick={handleExport}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            Exporter tout
+          </button>
         </div>
         <div className="table-wrap">
           <table>

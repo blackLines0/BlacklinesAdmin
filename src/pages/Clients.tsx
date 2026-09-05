@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
+import { exportToCsv } from "../lib/csvExport";
 import { queryKeys } from "../lib/queryKeys";
 import { avatarColor, formatDate, initialsOf } from "../lib/format";
 
@@ -20,9 +22,43 @@ export default function Clients() {
     queryKey: queryKeys.customers,
     queryFn: () => apiFetch<Customer[]>("/admin/customers"),
   });
+  const [search, setSearch] = useState("");
+
+  const filtered = customers.filter((c) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      c.nom.toLowerCase().includes(term) ||
+      (c.email ?? "").toLowerCase().includes(term) ||
+      (c.telephone ?? "").toLowerCase().includes(term)
+    );
+  });
+
+  function handleExport() {
+    exportToCsv("clients", filtered, [
+      { label: "Nom", value: (c) => c.nom },
+      { label: "Email", value: (c) => c.email ?? "" },
+      { label: "Téléphone", value: (c) => c.telephone ?? "" },
+      { label: "Adresse", value: (c) => c.adresse ?? "" },
+      { label: "Client depuis", value: (c) => formatDate(c.createdAt) },
+      { label: "Commandes", value: (c) => c.commandesCount },
+    ]);
+  }
 
   return (
-    <AdminLayout title="Clients" crumb={`${customers.length} clients`} searchPlaceholder="Rechercher un client...">
+    <AdminLayout
+      title="Clients"
+      crumb={`${customers.length} clients`}
+      searchPlaceholder="Rechercher un client..."
+      searchValue={search}
+      onSearchChange={setSearch}
+    >
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+        <button className="btn btn-outline btn-sm" type="button" onClick={handleExport}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+          Exporter tout
+        </button>
+      </div>
       <div className="panel">
         {loading ? (
           <div className="panel-body"><p className="cell-muted">Chargement...</p></div>
@@ -42,7 +78,7 @@ export default function Clients() {
                 </tr>
               </thead>
               <tbody>
-                {customers.map((c) => (
+                {filtered.map((c) => (
                   <tr key={c.id}>
                     <td>
                       <div className="cell-flex">
@@ -61,7 +97,7 @@ export default function Clients() {
                     </td>
                   </tr>
                 ))}
-                {customers.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr><td colSpan={6} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucun client</td></tr>
                 ) : null}
               </tbody>

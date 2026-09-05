@@ -54,6 +54,7 @@ export default function Produits() {
   const error = productsQuery.error ?? brandsQuery.error;
   const [tab, setTab] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
+  const [search, setSearch] = useState("");
 
   const tabs = useMemo(
     () => [
@@ -70,6 +71,7 @@ export default function Produits() {
   const filtered = products.filter((p) => {
     if (tab !== "all" && p.brand.slug !== tab) return false;
     if (statusFilter !== "all" && p.statut !== statusFilter) return false;
+    if (search.trim() && !p.nom.toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
   });
 
@@ -104,7 +106,13 @@ export default function Produits() {
   });
 
   return (
-    <AdminLayout title="Produits" crumb={`${products.length} produits — ${brands.length} marques`} searchPlaceholder="Rechercher un produit...">
+    <AdminLayout
+      title="Produits"
+      crumb={`${products.length} produits — ${brands.length} marques`}
+      searchPlaceholder="Rechercher un produit..."
+      searchValue={search}
+      onSearchChange={setSearch}
+    >
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
         <Link className="btn btn-primary" to="/produits/nouveau">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>

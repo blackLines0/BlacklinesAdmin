@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
+import { exportToCsv } from "../lib/csvExport";
 import { queryKeys } from "../lib/queryKeys";
 import {
   brandTagClass,
@@ -57,6 +58,7 @@ export default function Commandes() {
   });
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   const [canalTab, setCanalTab] = useState<Order["canal"] | "all">("all");
+  const [search, setSearch] = useState("");
 
   const updateStatus = useMutation({
     mutationFn: ({ id, statut }: { id: string; statut: OrderStatus }) =>
@@ -83,10 +85,34 @@ export default function Commandes() {
 
   const filtered = orders
     .filter((o) => tab === "all" || o.statut === tab)
-    .filter((o) => canalTab === "all" || o.canal === canalTab);
+    .filter((o) => canalTab === "all" || o.canal === canalTab)
+    .filter((o) => {
+      const term = search.trim().toLowerCase();
+      if (!term) return true;
+      return o.id.slice(-6).toLowerCase().includes(term) || o.customer.nom.toLowerCase().includes(term);
+    });
+
+  function handleExport() {
+    exportToCsv("commandes", filtered, [
+      { label: "Commande", value: (o) => `#${o.id.slice(-6).toUpperCase()}` },
+      { label: "Client", value: (o) => o.customer.nom },
+      { label: "Date", value: (o) => formatDate(o.createdAt) },
+      { label: "Marque", value: (o) => o.items[0]?.product.brand.nom ?? "" },
+      { label: "Canal", value: (o) => CANAL_LABELS[o.canal] },
+      { label: "Paiement", value: (o) => o.moyenPaiement },
+      { label: "Montant", value: (o) => o.montantTotal },
+      { label: "Statut", value: (o) => ORDER_STATUS_LABELS[o.statut] },
+    ]);
+  }
 
   return (
-    <AdminLayout title="Commandes" crumb={`${orders.length} commandes au total`} searchPlaceholder="Rechercher une commande...">
+    <AdminLayout
+      title="Commandes"
+      crumb={`${orders.length} commandes au total`}
+      searchPlaceholder="Rechercher une commande..."
+      searchValue={search}
+      onSearchChange={setSearch}
+    >
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">En attente</span><div className="kpi-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg></div></div>
@@ -123,6 +149,10 @@ export default function Commandes() {
             onChange={(v) => setCanalTab(v as Order["canal"] | "all")}
             options={CANAL_SELECT_OPTIONS}
           />
+          <button className="btn btn-outline btn-sm" type="button" onClick={handleExport}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            Exporter tout
+          </button>
         </div>
 
         {loading ? (
