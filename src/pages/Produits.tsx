@@ -35,6 +35,7 @@ interface Product {
   prixPromo: number | null;
   stock: number;
   statut: ProductStatus;
+  visible: boolean;
   images: string[];
   brand: Brand;
 }
@@ -85,6 +86,23 @@ export default function Produits() {
     deleteProduct.mutate(id);
   }
 
+  const toggleVisible = useMutation({
+    mutationFn: (product: Product) =>
+      apiFetch(`/admin/products/${product.id}`, { method: "PATCH", body: JSON.stringify({ visible: !product.visible }) }),
+    onMutate: async (product) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.products });
+      const previous = queryClient.getQueryData<Product[]>(queryKeys.products);
+      queryClient.setQueryData<Product[]>(queryKeys.products, (prev) =>
+        prev?.map((p) => (p.id === product.id ? { ...p, visible: !p.visible } : p)),
+      );
+      return { previous };
+    },
+    onError: (err, _product, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.products, context.previous);
+      alert(err instanceof Error ? err.message : "Échec de la mise à jour");
+    },
+  });
+
   return (
     <AdminLayout title="Produits" crumb={`${products.length} produits — ${brands.length} marques`} searchPlaceholder="Rechercher un produit...">
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
@@ -131,6 +149,7 @@ export default function Produits() {
                   <th>Prix</th>
                   <th>Stock</th>
                   <th>Statut</th>
+                  <th>Visibilité</th>
                   <th></th>
                 </tr>
               </thead>
@@ -157,6 +176,15 @@ export default function Produits() {
                     <td>{product.stock}</td>
                     <td><span className={`badge ${statusBadgeClass(product.statut)}`}>{PRODUCT_STATUS_LABELS[product.statut]}</span></td>
                     <td>
+                      <button
+                        className={`badge ${product.visible ? "success" : "neutral"}`}
+                        onClick={() => toggleVisible.mutate(product)}
+                        style={{ cursor: "pointer", border: "none" }}
+                      >
+                        {product.visible ? "Visible" : "Masqué"}
+                      </button>
+                    </td>
+                    <td>
                       <div style={{ display: "flex", gap: 4 }}>
                         <Link className="icon-action" aria-label="Modifier" to={`/produits/${product.id}/modifier`}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
@@ -169,7 +197,7 @@ export default function Produits() {
                   </tr>
                 ))}
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucun produit</td></tr>
+                  <tr><td colSpan={7} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucun produit</td></tr>
                 ) : null}
               </tbody>
             </table>

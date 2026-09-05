@@ -45,6 +45,7 @@ interface Product {
   images: string[];
   stock: number;
   statut: "en_stock" | "stock_faible" | "epuise";
+  visible: boolean;
   variants: { sizeOptionId: string; stock: number }[];
 }
 
@@ -69,6 +70,7 @@ export default function ProduitForm() {
   const [prixPromo, setPrixPromo] = useState("");
   const [stock, setStock] = useState("");
   const [statut, setStatut] = useState<Product["statut"]>("en_stock");
+  const [visible, setVisible] = useState(true);
   const [description, setDescription] = useState("");
   const [mainImage, setMainImage] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -111,6 +113,7 @@ export default function ProduitForm() {
     setPrixPromo(existingProduct.prixPromo !== null ? String(existingProduct.prixPromo) : "");
     setStock(String(existingProduct.stock));
     setStatut(existingProduct.statut);
+    setVisible(existingProduct.visible);
     setDescription(existingProduct.description ?? "");
     setMainImage(existingProduct.images[0] ?? null);
     setGalleryImages(existingProduct.images.slice(1));
@@ -187,6 +190,7 @@ export default function ProduitForm() {
         prixPromo: prixPromo ? Number(prixPromo) : undefined,
         stock: Number(stock),
         statut,
+        visible,
         description: description || undefined,
         images,
         ...(brandDetail?.sizeOptions.length ? { variants } : {}),
@@ -327,6 +331,17 @@ export default function ProduitForm() {
                   value={statut}
                   onChange={(v) => setStatut(v as Product["statut"])}
                   options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+                />
+              </div>
+              <div className="field">
+                <label>Visibilité sur le site</label>
+                <Select
+                  value={visible ? "visible" : "masque"}
+                  onChange={(v) => setVisible(v === "visible")}
+                  options={[
+                    { value: "visible", label: "Visible" },
+                    { value: "masque", label: "Masqué (hors ligne)" },
+                  ]}
                 />
               </div>
               <div className="field">
