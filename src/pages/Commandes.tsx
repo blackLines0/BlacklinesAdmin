@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import {
   brandTagClass,
   formatDate,
   formatPrice,
   ORDER_STATUS_LABELS,
+  statusBadgeClass,
   type OrderStatus,
 } from "../lib/format";
 
@@ -34,20 +36,16 @@ const CANAL_LABELS: Record<Order["canal"], string> = {
 };
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
-const STATUS_BG: Record<OrderStatus, string> = {
-  en_attente: "var(--warning-soft)",
-  payee: "var(--success-soft)",
-  expediee: "var(--info-soft)",
-  livree: "#F1F5F9",
-  annulee: "var(--danger-soft)",
-};
-const STATUS_COLOR: Record<OrderStatus, string> = {
-  en_attente: "var(--warning)",
-  payee: "var(--success)",
-  expediee: "var(--info)",
-  livree: "var(--ink-soft)",
-  annulee: "var(--danger)",
-};
+const STATUS_SELECT_OPTIONS: SelectOption[] = STATUS_OPTIONS.map(([value, label]) => ({
+  value,
+  label,
+  tone: statusBadgeClass(value) as SelectOption["tone"],
+}));
+const CANAL_SELECT_OPTIONS: SelectOption[] = [
+  { value: "all", label: "Canal : Tous" },
+  { value: "en_ligne", label: "En ligne" },
+  { value: "boutique", label: "Boutique" },
+];
 
 export default function Commandes() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -120,11 +118,12 @@ export default function Commandes() {
             ))}
           </div>
           <div className="spacer" />
-          <select className="select-sm" value={canalTab} onChange={(e) => setCanalTab(e.target.value as Order["canal"] | "all")}>
-            <option value="all">Canal : Tous</option>
-            <option value="en_ligne">{CANAL_LABELS.en_ligne}</option>
-            <option value="boutique">{CANAL_LABELS.boutique}</option>
-          </select>
+          <Select
+            size="sm"
+            value={canalTab}
+            onChange={(v) => setCanalTab(v as Order["canal"] | "all")}
+            options={CANAL_SELECT_OPTIONS}
+          />
         </div>
 
         {loading ? (
@@ -164,22 +163,12 @@ export default function Commandes() {
                       <td className="cell-muted">{order.moyenPaiement}</td>
                       <td className="cell-primary">{formatPrice(order.montantTotal)}</td>
                       <td>
-                        <select
-                          className="select-sm"
+                        <Select
+                          size="sm"
                           value={order.statut}
-                          onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
-                          style={{
-                            border: "none",
-                            background: STATUS_BG[order.statut],
-                            color: STATUS_COLOR[order.statut],
-                            fontWeight: 700,
-                            padding: "5px 10px",
-                          }}
-                        >
-                          {STATUS_OPTIONS.map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => updateStatus(order.id, v as OrderStatus)}
+                          options={STATUS_SELECT_OPTIONS}
+                        />
                       </td>
                       <td>
                         <Link className="icon-action" aria-label="Voir" to={`/commandes/${order.id}`}>

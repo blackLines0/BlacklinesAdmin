@@ -229,7 +229,7 @@ export default function MarqueDetail() {
               </div>
             )}
             <form onSubmit={addCategory} style={{ display: "flex", gap: 10 }}>
-              <input type="text" placeholder="Nouvelle catégorie (ex. Chemises)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ flex: 1 }} />
+              <input className="text-input" type="text" placeholder="Nouvelle catégorie (ex. Chemises)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ flex: 1 }} />
               <button className="btn btn-outline" type="submit">Ajouter</button>
             </form>
           </div>
@@ -255,8 +255,8 @@ export default function MarqueDetail() {
               </div>
             )}
             <form onSubmit={addSizeOption} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <input type="text" placeholder="Label (ex. X1, M, 50ml...)" value={newSizeLabel} onChange={(e) => setNewSizeLabel(e.target.value)} />
-              <input type="text" placeholder="Guide (ex. 2m² — 1m de largeur x 3m de longueur)" value={newSizeDescription} onChange={(e) => setNewSizeDescription(e.target.value)} />
+              <input className="text-input" type="text" placeholder="Label (ex. X1, M, 50ml...)" value={newSizeLabel} onChange={(e) => setNewSizeLabel(e.target.value)} />
+              <input className="text-input" type="text" placeholder="Guide (ex. 2m² — 1m de largeur x 3m de longueur)" value={newSizeDescription} onChange={(e) => setNewSizeDescription(e.target.value)} />
               <button className="btn btn-outline" type="submit">Ajouter la taille</button>
             </form>
           </div>

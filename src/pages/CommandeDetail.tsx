@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import {
   formatDate,
@@ -29,6 +30,11 @@ interface Order {
 }
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
+const STATUS_SELECT_OPTIONS: SelectOption[] = STATUS_OPTIONS.map(([value, label]) => ({
+  value,
+  label,
+  tone: statusBadgeClass(value) as SelectOption["tone"],
+}));
 
 export default function CommandeDetail() {
   const { id } = useParams();
@@ -129,14 +135,7 @@ export default function CommandeDetail() {
           <div className="panel-body">
             <div className="field">
               <label>Statut</label>
-              <select value={statut} onChange={(e) => setStatut(e.target.value as OrderStatus)}>
-                {STATUS_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <span className={`badge ${statusBadgeClass(statut)}`}>{ORDER_STATUS_LABELS[statut]}</span>
+              <Select value={statut} onChange={(v) => setStatut(v as OrderStatus)} options={STATUS_SELECT_OPTIONS} />
             </div>
 
             <div style={{ marginTop: 22 }}>

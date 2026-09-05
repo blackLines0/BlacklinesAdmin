@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select } from "../components/Select";
 import { apiFetch, uploadImage } from "../lib/api";
 
 interface Brand {
@@ -317,28 +318,30 @@ export default function ProduitForm() {
               </div>
               <div className="field">
                 <label>Marque</label>
-                <select value={brandId} onChange={(e) => { setBrandId(e.target.value); setCategoryId(""); setVariantStocks({}); }} required>
-                  {brands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.nom}</option>
-                  ))}
-                </select>
+                <Select
+                  value={brandId}
+                  onChange={(v) => { setBrandId(v); setCategoryId(""); setVariantStocks({}); }}
+                  options={brands.map((b) => ({ value: b.id, label: b.nom }))}
+                />
               </div>
               <div className="field">
                 <label>Catégorie</label>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  <option value="">Aucune</option>
-                  {brandDetail?.categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nom}</option>
-                  ))}
-                </select>
+                <Select
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  options={[
+                    { value: "", label: "Aucune" },
+                    ...(brandDetail?.categories.map((c) => ({ value: c.id, label: c.nom })) ?? []),
+                  ]}
+                />
               </div>
               <div className="field">
                 <label>Statut</label>
-                <select value={statut} onChange={(e) => setStatut(e.target.value as Product["statut"])}>
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
+                <Select
+                  value={statut}
+                  onChange={(v) => setStatut(v as Product["statut"])}
+                  options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+                />
               </div>
               <div className="field">
                 <label>Prix (FCFA)</label>

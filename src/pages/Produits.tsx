@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select, type SelectOption } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import {
   brandTagClass,
@@ -9,6 +10,15 @@ import {
   statusBadgeClass,
   type ProductStatus,
 } from "../lib/format";
+
+const STATUS_SELECT_OPTIONS: SelectOption[] = [
+  { value: "all", label: "Statut : Tous" },
+  ...Object.entries(PRODUCT_STATUS_LABELS).map(([value, label]) => ({
+    value,
+    label,
+    tone: statusBadgeClass(value) as SelectOption["tone"],
+  })),
+];
 
 interface Brand {
   id: string;
@@ -101,12 +111,12 @@ export default function Produits() {
             ))}
           </div>
           <div className="spacer" />
-          <select className="select-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as ProductStatus | "all")}>
-            <option value="all">Statut : Tous</option>
-            {Object.entries(PRODUCT_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          <Select
+            size="sm"
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as ProductStatus | "all")}
+            options={STATUS_SELECT_OPTIONS}
+          />
         </div>
 
         {loading ? (

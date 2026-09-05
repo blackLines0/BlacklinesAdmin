@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
+import { Combobox } from "../components/Combobox";
+import { Select } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import { brandTagClass, formatDate, formatPrice } from "../lib/format";
 
@@ -140,22 +142,25 @@ export default function Ventes() {
               <div className="form-grid">
                 <div className="field">
                   <label>Produit</label>
-                  <select value={productId} onChange={(e) => setProductId(e.target.value)} required>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.brand.nom} — {p.nom}</option>
-                    ))}
-                  </select>
+                  <Combobox
+                    value={productId}
+                    onChange={setProductId}
+                    placeholder="Rechercher un produit..."
+                    options={products.map((p) => ({ value: p.id, label: p.nom, keywords: p.brand.nom }))}
+                  />
                 </div>
                 {selectedProduct && selectedProduct.variants.length ? (
                   <div className="field">
                     <label>Taille</label>
-                    <select value={variantId} onChange={(e) => setVariantId(e.target.value)} required>
-                      {selectedProduct.variants.map((v) => (
-                        <option key={v.id} value={v.id} disabled={v.stock < 1}>
-                          {v.sizeOption.label} ({v.stock} en stock)
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={variantId}
+                      onChange={setVariantId}
+                      options={selectedProduct.variants.map((v) => ({
+                        value: v.id,
+                        label: `${v.sizeOption.label} (${v.stock} en stock)`,
+                        disabled: v.stock < 1,
+                      }))}
+                    />
                   </div>
                 ) : (
                   <div className="field">
@@ -173,11 +178,11 @@ export default function Ventes() {
                 </div>
                 <div className="field">
                   <label>Moyen de paiement</label>
-                  <select value={moyenPaiement} onChange={(e) => setMoyenPaiement(e.target.value)}>
-                    {PAIEMENT_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  <Select
+                    value={moyenPaiement}
+                    onChange={setMoyenPaiement}
+                    options={PAIEMENT_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                  />
                 </div>
                 <div className="field">
                   <label>Total</label>
@@ -197,7 +202,7 @@ export default function Ventes() {
                   </div>
                 </div>
               ) : (
-                <button type="button" className="btn-outline" style={{ marginTop: 4, marginBottom: 16 }} onClick={() => setShowClient(true)}>
+                <button type="button" className="btn btn-outline" style={{ marginTop: 4, marginBottom: 16 }} onClick={() => setShowClient(true)}>
                   + Noter les infos du client
                 </button>
               )}

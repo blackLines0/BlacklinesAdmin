@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select, selectOptions } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import {
   avatarColor,
@@ -11,6 +12,8 @@ import {
   type UserRole,
   type UserStatus,
 } from "../lib/format";
+
+const ROLE_SELECT_OPTIONS = selectOptions(ROLE_LABELS);
 
 interface Brand {
   id: string;
@@ -27,8 +30,6 @@ interface User {
   statut: UserStatus;
   createdAt: string;
 }
-
-const ROLE_OPTIONS = Object.entries(ROLE_LABELS) as [UserRole, string][];
 
 const TABS: { key: UserRole | "all"; label: string }[] = [
   { key: "all", label: "Tous" },
@@ -166,11 +167,7 @@ export default function Utilisateurs() {
                   </div>
                   <div className="field">
                     <label>Rôle</label>
-                    <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)}>
-                      {ROLE_OPTIONS.map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+                    <Select value={inviteRole} onChange={(v) => setInviteRole(v as UserRole)} options={ROLE_SELECT_OPTIONS} />
                   </div>
                   <div className="field">
                     <label>Accès marques</label>
@@ -245,11 +242,7 @@ export default function Utilisateurs() {
                       </div>
                     </td>
                     <td>
-                      <select className="select-sm" value={user.role} onChange={(e) => updateRole(user.id, e.target.value as UserRole)}>
-                        {ROLE_OPTIONS.map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
+                      <Select size="sm" value={user.role} onChange={(v) => updateRole(user.id, v as UserRole)} options={ROLE_SELECT_OPTIONS} />
                     </td>
                     <td className="cell-muted">{user.accesMarques.length ? user.accesMarques.join(", ") : "Aucune"}</td>
                     <td className="cell-muted">{formatDate(user.createdAt)}</td>

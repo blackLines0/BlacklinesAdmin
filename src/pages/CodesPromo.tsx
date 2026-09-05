@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
+import { Select } from "../components/Select";
 import { apiFetch } from "../lib/api";
 import { formatDate } from "../lib/format";
+
+const TYPE_OPTIONS = [
+  { value: "pourcentage", label: "Pourcentage (%)" },
+  { value: "montantFixe", label: "Montant fixe (FCFA)" },
+];
 
 interface PromoCode {
   id: string;
@@ -112,10 +118,7 @@ export default function CodesPromo() {
               </div>
               <div className="field">
                 <label>Type de réduction</label>
-                <select value={type} onChange={(e) => setType(e.target.value as "pourcentage" | "montantFixe")}>
-                  <option value="pourcentage">Pourcentage (%)</option>
-                  <option value="montantFixe">Montant fixe (FCFA)</option>
-                </select>
+                <Select value={type} onChange={(v) => setType(v as "pourcentage" | "montantFixe")} options={TYPE_OPTIONS} />
               </div>
               <div className="field">
                 <label>Valeur</label>
