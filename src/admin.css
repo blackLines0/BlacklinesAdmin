@@ -99,6 +99,16 @@ main{min-width:0;}
 .icon-btn svg{width:18px; height:18px;}
 .notif-dot{position:absolute; top:7px; right:8px; width:7px; height:7px; border-radius:50%; background:var(--danger); border:1.5px solid var(--panel);}
 
+.topbar-left{display:flex; align-items:center; gap:6px; min-width:0;}
+.menu-toggle{
+  display:none; width:36px; height:36px; border-radius:8px; align-items:center; justify-content:center;
+  color:var(--ink-soft); flex-shrink:0;
+}
+.menu-toggle:hover{background:var(--bg);}
+.menu-toggle svg{width:20px; height:20px;}
+
+.sidebar-backdrop{display:none;}
+
 .content{padding:28px 32px 60px;}
 
 /* ---------- KPI CARDS ---------- */
@@ -312,12 +322,38 @@ tbody tr:hover{background:#FBFCFE;}
 /* ---------- RESPONSIVE ---------- */
 @media (max-width:1080px){
   .app{grid-template-columns:1fr;}
-  .sidebar{display:none;}
+
+  .menu-toggle{display:flex;}
+
+  .sidebar{
+    position:fixed; top:0; left:0; z-index:50; width:248px;
+    transform:translateX(-100%); transition:transform .2s ease; box-shadow:0 0 40px rgba(0,0,0,0.3);
+  }
+  .sidebar.open{transform:translateX(0);}
+
+  .sidebar-backdrop{
+    display:block; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:40;
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .sidebar-backdrop.open{opacity:1; pointer-events:auto;}
+
   .kpi-grid{grid-template-columns:1fr 1fr;}
   .two-col{grid-template-columns:1fr;}
+  .detail-grid{grid-template-columns:1fr;}
 }
 @media (max-width:640px){
   .kpi-grid{grid-template-columns:1fr;}
   .content{padding:20px;}
   .search-box{display:none;}
+  .topbar{padding:0 16px;}
+
+  .form-grid{grid-template-columns:1fr;}
+  .form-grid .field.full{grid-column:1/2;}
+
+  .filter-bar{padding:14px 16px;}
+  .filter-tabs{overflow-x:auto; max-width:100%;}
+
+  .panel-body{padding:18px;}
+  .panel-head{padding:16px 18px;}
+  thead th, tbody td{padding-left:16px; padding-right:16px;}
 }

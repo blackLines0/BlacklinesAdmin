@@ -179,10 +179,23 @@ export function AdminLayout({
   const secondaryItems = SECONDARY_NAV_ITEMS.filter((item) => item.roles.includes(role));
   const secondaryHasActive = secondaryItems.some((item) => location.pathname.startsWith(item.href));
   const [secondaryOpen, setSecondaryOpen] = useState(secondaryHasActive);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (secondaryHasActive) setSecondaryOpen(true);
   }, [secondaryHasActive]);
+
+  // Close the mobile drawer on every navigation, and lock background scroll while it's open.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
 
   // Same query keys as the pages themselves (Commandes, Ventes, Clients,
   // Marques, Produits, Avis) — these share one cached fetch instead of each
@@ -226,7 +239,12 @@ export function AdminLayout({
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <div
+        className={`sidebar-backdrop${mobileNavOpen ? " open" : ""}`}
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
+      />
+      <aside className={`sidebar${mobileNavOpen ? " open" : ""}`}>
         <div className="sidebar-brand">
           <img className="logo-mark" src="/logowhite.png" alt="Blacklines" />
           <div><div className="name">Blacklines</div><div className="tag">Espace admin</div></div>
@@ -299,9 +317,21 @@ export function AdminLayout({
 
       <main>
         <div className="topbar">
-          <div>
-            <div className="page-title">{title}</div>
-            <div className="page-crumb">{crumb}</div>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label="Ouvrir le menu"
+              onClick={() => setMobileNavOpen((v) => !v)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+              </svg>
+            </button>
+            <div>
+              <div className="page-title">{title}</div>
+              <div className="page-crumb">{crumb}</div>
+            </div>
           </div>
           <div className="topbar-right">
             <div className="search-box">
