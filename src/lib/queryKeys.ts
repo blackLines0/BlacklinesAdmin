@@ -18,4 +18,5 @@ export const queryKeys = {
   promoCodes: ["promo-codes"] as const,
   heroSlides: ["hero-slides"] as const,
   announcement: ["announcement"] as const,
+  notifications: ["notifications"] as const,
 };
