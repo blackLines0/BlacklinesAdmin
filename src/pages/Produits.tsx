@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import {
@@ -42,6 +43,7 @@ interface Product {
 
 export default function Produits() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [productsQuery, brandsQuery] = useQueries({
     queries: [
       { queryKey: queryKeys.products, queryFn: () => apiFetch<Product[]>("/admin/products") },
@@ -83,8 +85,9 @@ export default function Produits() {
     onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
   });
 
-  function handleDelete(id: string) {
-    if (!confirm("Supprimer ce produit ?")) return;
+  async function handleDelete(id: string) {
+    const confirmed = await confirm("Supprimer ce produit ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     deleteProduct.mutate(id);
   }
 

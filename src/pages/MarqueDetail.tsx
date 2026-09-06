@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -35,6 +36,7 @@ interface BrandListItem {
 export default function MarqueDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   const { data: brandsList } = useQuery({
@@ -133,8 +135,12 @@ export default function MarqueDetail() {
     saveInfo.mutate();
   }
 
-  function handleDeleteBrand() {
-    if (!confirm(`Supprimer définitivement la marque "${brand?.nom}" ? Cette action est impossible si des produits, catégories ou tailles y sont encore rattachés.`)) return;
+  async function handleDeleteBrand() {
+    const confirmed = await confirm(
+      `Supprimer définitivement la marque "${brand?.nom}" ? Cette action est impossible si des produits, catégories ou tailles y sont encore rattachés.`,
+      { confirmLabel: "Supprimer", danger: true },
+    );
+    if (!confirmed) return;
     deleteBrand.mutate();
   }
 
@@ -144,8 +150,9 @@ export default function MarqueDetail() {
     addCategory.mutate();
   }
 
-  function handleRemoveCategory(categoryId: string) {
-    if (!confirm("Supprimer cette catégorie ?")) return;
+  async function handleRemoveCategory(categoryId: string) {
+    const confirmed = await confirm("Supprimer cette catégorie ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     removeCategory.mutate(categoryId);
   }
 
@@ -155,8 +162,9 @@ export default function MarqueDetail() {
     addSizeOption.mutate();
   }
 
-  function handleRemoveSizeOption(sizeId: string) {
-    if (!confirm("Supprimer cette taille ?")) return;
+  async function handleRemoveSizeOption(sizeId: string) {
+    const confirmed = await confirm("Supprimer cette taille ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     removeSizeOption.mutate(sizeId);
   }
 

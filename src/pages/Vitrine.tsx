@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch, uploadImage } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -24,6 +25,7 @@ interface Announcement {
 
 export default function Vitrine() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { data: slides = [], isLoading: loadingSlides } = useQuery({
     queryKey: queryKeys.heroSlides,
     queryFn: () => apiFetch<HeroSlide[]>("/admin/hero-slides"),
@@ -109,8 +111,9 @@ export default function Vitrine() {
     onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
   });
 
-  function handleRemoveSlide(id: string) {
-    if (!confirm("Supprimer cette image du hero ?")) return;
+  async function handleRemoveSlide(id: string) {
+    const confirmed = await confirm("Supprimer cette image du hero ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     removeSlide.mutate(id);
   }
 

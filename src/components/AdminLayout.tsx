@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { NotificationBell } from "./NotificationBell";
+import { useConfirm } from "./ConfirmModal";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrateur",
@@ -176,6 +177,7 @@ export function AdminLayout({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { user, logout } = useAuth();
   const initials = user ? initialsOf(user.nom) : "";
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
@@ -237,7 +239,12 @@ export function AdminLayout({
     produits: products?.length ?? 0,
   };
 
-  function handleLogout() {
+  async function handleLogout() {
+    const confirmed = await confirm("Voulez-vous vraiment vous déconnecter ?", {
+      confirmLabel: "Se déconnecter",
+      danger: true,
+    });
+    if (!confirmed) return;
     logout();
     navigate("/login");
   }

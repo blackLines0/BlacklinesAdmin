@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select } from "../components/Select";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { formatDate } from "../lib/format";
@@ -27,6 +28,7 @@ interface PromoCode {
 
 export default function CodesPromo() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { data: codes = [], isLoading: loading, error } = useQuery({
     queryKey: queryKeys.promoCodes,
     queryFn: () => apiFetch<PromoCode[]>("/admin/promo-codes"),
@@ -96,8 +98,9 @@ export default function CodesPromo() {
     onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
   });
 
-  function remove(id: string) {
-    if (!confirm("Supprimer ce code promo ?")) return;
+  async function remove(id: string) {
+    const confirmed = await confirm("Supprimer ce code promo ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     removeCode.mutate(id);
   }
 

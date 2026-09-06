@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { formatDate } from "../lib/format";
@@ -47,6 +48,7 @@ function Stars({ note }: { note: number }) {
 
 export default function Avis() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { data: reviews = [], isLoading: loading, error } = useQuery({
     queryKey: queryKeys.reviews,
     queryFn: () => apiFetch<Review[]>("/admin/reviews"),
@@ -83,8 +85,9 @@ export default function Avis() {
     onError: (err) => alert(err instanceof Error ? err.message : "Échec de la suppression"),
   });
 
-  function remove(id: string) {
-    if (!confirm("Supprimer définitivement cet avis ?")) return;
+  async function remove(id: string) {
+    const confirmed = await confirm("Supprimer définitivement cet avis ?", { confirmLabel: "Supprimer", danger: true });
+    if (!confirmed) return;
     removeReview.mutate(id);
   }
 
