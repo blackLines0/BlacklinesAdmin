@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
-import { apiFetch } from "../lib/api";
+import { apiFetch, downloadInvoice, sendInvoiceEmail } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import {
   formatDate,
@@ -27,7 +27,7 @@ interface Order {
   montantTotal: number;
   moyenPaiement: string;
   createdAt: string;
-  customer: { nom: string; telephone: string; adresse: string | null };
+  customer: { nom: string; email: string | null; telephone: string; adresse: string | null };
   items: OrderItem[];
 }
 
@@ -63,6 +63,17 @@ export default function CommandeDetail() {
       navigate("/commandes");
     },
     onError: (err) => alert(err instanceof Error ? err.message : "Échec de la mise à jour"),
+  });
+
+  const downloadInvoiceMutation = useMutation({
+    mutationFn: () => downloadInvoice(id!),
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec du téléchargement de la facture"),
+  });
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: () => sendInvoiceEmail(id!),
+    onSuccess: () => alert("Facture envoyée par email."),
+    onError: (err) => alert(err instanceof Error ? err.message : "Échec de l'envoi de la facture"),
   });
 
   if (loading) {
@@ -139,6 +150,29 @@ export default function CommandeDetail() {
                 {save.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
+          </div>
+
+          <div className="panel-head" style={{ borderTop: "1px solid var(--line)" }}>
+            <div><h3>Facture</h3></div>
+          </div>
+          <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={() => downloadInvoiceMutation.mutate()}
+              disabled={downloadInvoiceMutation.isPending}
+            >
+              {downloadInvoiceMutation.isPending ? "Génération..." : "Télécharger la facture"}
+            </button>
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={() => sendInvoiceMutation.mutate()}
+              disabled={sendInvoiceMutation.isPending || !order.customer.email}
+              title={order.customer.email ? undefined : "Le client n'a pas d'adresse email"}
+            >
+              {sendInvoiceMutation.isPending ? "Envoi..." : "Envoyer par email"}
+            </button>
           </div>
         </div>
       </div>

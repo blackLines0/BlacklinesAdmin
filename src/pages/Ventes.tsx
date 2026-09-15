@@ -1,5 +1,6 @@
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Combobox } from "../components/Combobox";
 import { Select } from "../components/Select";
@@ -108,7 +109,7 @@ export default function Ventes() {
       queryClient.invalidateQueries({ queryKey: queryKeys.ordersBoutique });
       queryClient.invalidateQueries({ queryKey: queryKeys.orders });
       queryClient.invalidateQueries({ queryKey: queryKeys.products });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardAll });
     },
     onError: (err) => setError(err instanceof Error ? err.message : "Échec de l'enregistrement"),
   });
@@ -245,6 +246,7 @@ export default function Ventes() {
                 <th>Client</th>
                 <th>Paiement</th>
                 <th>Montant</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -260,11 +262,16 @@ export default function Ventes() {
                     <td>{v.customer.nom}</td>
                     <td className="cell-muted">{v.moyenPaiement}</td>
                     <td className="cell-primary">{formatPrice(v.montantTotal)}</td>
+                    <td>
+                      <Link className="icon-action" aria-label="Voir" to={`/commandes/${v.id}`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+                      </Link>
+                    </td>
                   </tr>
                 );
               })}
               {ventes.length === 0 ? (
-                <tr><td colSpan={6} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune vente en boutique pour l&apos;instant</td></tr>
+                <tr><td colSpan={7} className="cell-muted" style={{ textAlign: "center", padding: 30 }}>Aucune vente en boutique pour l&apos;instant</td></tr>
               ) : null}
             </tbody>
           </table>

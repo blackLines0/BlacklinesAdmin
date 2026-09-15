@@ -84,3 +84,31 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
     body: form,
   });
 }
+
+export async function downloadInvoice(orderId: string): Promise<void> {
+  const session = getSession();
+  const res = await fetch(`${API_URL}/admin/orders/${orderId}/invoice`, {
+    headers: session?.token ? { Authorization: `Bearer ${session.token}` } : undefined,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Échec du téléchargement de la facture (${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const filename = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ?? `facture-${orderId}.pdf`;
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function sendInvoiceEmail(orderId: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(`/admin/orders/${orderId}/invoice/send`, { method: "POST" });
+}

@@ -1,8 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { AdminLayout } from "../components/AdminLayout";
 import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatPrice, ORDER_STATUS_LABELS, statusBadgeClass, type OrderStatus } from "../lib/format";
+
+type Period = "7d" | "30d" | "6m" | "1y" | "custom";
+
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: "7d", label: "7 jours" },
+  { value: "30d", label: "Mois" },
+  { value: "6m", label: "6 mois" },
+  { value: "1y", label: "Année" },
+  { value: "custom", label: "Personnalisé" },
+];
+
+const PERIOD_TITLES: Record<Period, string> = {
+  "7d": "Ventes — 7 derniers jours",
+  "30d": "Ventes — 30 derniers jours",
+  "6m": "Ventes — 6 derniers mois",
+  "1y": "Ventes — 12 derniers mois",
+  custom: "Ventes — période personnalisée",
+};
 
 interface DashboardData {
   chiffreAffaires: number;
@@ -11,7 +30,7 @@ interface DashboardData {
   parCanal: { enLigne: number; boutique: number };
   ventesParMarque: { slug: string; nom: string; pct: number }[];
   topProducts: { nom: string; ventes: number; montant: number; image: string | null }[];
-  salesLast7Days: { label: string; total: number }[];
+  salesTimeline: { label: string; total: number }[];
   recentOrders: { id: string; client: string; montant: number; statut: OrderStatus; canal: "en_ligne" | "boutique"; brand: string | null; brandNom: string | null }[];
 }
 
@@ -30,33 +49,72 @@ function donutSegments(parts: { pct: number; slug: string }[]) {
   });
 }
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function Dashboard() {
+  const [period, setPeriod] = useState<Period>("30d");
+  const [from, setFrom] = useState(todayIso());
+  const [to, setTo] = useState(todayIso());
+
+  const isCustomReady = period !== "custom" || Boolean(from && to);
+
   const { data, isLoading: loading, error } = useQuery({
-    queryKey: queryKeys.dashboard,
-    queryFn: () => apiFetch<DashboardData>("/admin/dashboard"),
+    queryKey: queryKeys.dashboard(period, period === "custom" ? from : undefined, period === "custom" ? to : undefined),
+    queryFn: () => {
+      const params = new URLSearchParams({ period });
+      if (period === "custom") {
+        params.set("from", from);
+        params.set("to", to);
+      }
+      return apiFetch<DashboardData>(`/admin/dashboard?${params.toString()}`);
+    },
+    enabled: isCustomReady,
   });
-
-  if (loading) {
-    return (
-      <AdminLayout title="Tableau de bord" crumb="Aperçu des ventes — toutes marques">
-        <p className="cell-muted">Chargement...</p>
-      </AdminLayout>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <AdminLayout title="Tableau de bord" crumb="Aperçu des ventes — toutes marques">
-        <p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p>
-      </AdminLayout>
-    );
-  }
-
-  const maxDay = Math.max(1, ...data.salesLast7Days.map((d) => d.total));
-  const segments = donutSegments(data.ventesParMarque);
 
   return (
     <AdminLayout title="Tableau de bord" crumb="Aperçu des ventes — toutes marques">
+      <div className="filter-bar" style={{ marginBottom: 20 }}>
+        <div className="filter-tabs">
+          {PERIOD_OPTIONS.map((opt) => (
+            <span
+              key={opt.value}
+              className={`filter-tab${period === opt.value ? " active" : ""}`}
+              onClick={() => setPeriod(opt.value)}
+              style={{ cursor: "pointer" }}
+            >
+              {opt.label}
+            </span>
+          ))}
+        </div>
+        {period === "custom" ? (
+          <>
+            <div className="spacer" />
+            <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+            <span className="cell-muted">au</span>
+            <input type="date" value={to} min={from} max={todayIso()} onChange={(e) => setTo(e.target.value)} />
+          </>
+        ) : null}
+      </div>
+
+      {loading || !isCustomReady ? (
+        <p className="cell-muted">Chargement...</p>
+      ) : error || !data ? (
+        <p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p>
+      ) : (
+        <DashboardContent data={data} period={period} />
+      )}
+    </AdminLayout>
+  );
+}
+
+function DashboardContent({ data, period }: { data: DashboardData; period: Period }) {
+  const maxPoint = Math.max(1, ...data.salesTimeline.map((d) => d.total));
+  const segments = donutSegments(data.ventesParMarque);
+
+  return (
+    <>
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-top">
@@ -89,16 +147,16 @@ export default function Dashboard() {
         <div className="panel">
           <div className="panel-head">
             <div>
-              <h3>Ventes — 7 derniers jours</h3>
+              <h3>{PERIOD_TITLES[period]}</h3>
               <div className="sub">Toutes marques confondues</div>
             </div>
           </div>
           <div className="panel-body">
             <div className="bar-chart">
-              {data.salesLast7Days.map((day, i) => (
+              {data.salesTimeline.map((point, i) => (
                 <div className="bar-col" key={i}>
-                  <div className={`bar${day.total === maxDay && maxDay > 0 ? " hi" : ""}`} style={{ height: `${Math.max(4, (day.total / maxDay) * 100)}%` }} />
-                  <span className="bar-label">{day.label}</span>
+                  <div className={`bar${point.total === maxPoint && maxPoint > 0 ? " hi" : ""}`} style={{ height: `${Math.max(4, (point.total / maxPoint) * 100)}%` }} />
+                  <span className="bar-label">{point.label}</span>
                 </div>
               ))}
             </div>
@@ -192,6 +250,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </>
   );
 }

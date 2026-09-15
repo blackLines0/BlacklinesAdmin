@@ -3,7 +3,9 @@
 // that's what let AdminLayout's sidebar counts and a page's own list query
 // dedupe into a single network request instead of firing twice.
 export const queryKeys = {
-  dashboard: ["dashboard"] as const,
+  dashboard: (period: string, from?: string, to?: string) => ["dashboard", period, from, to] as const,
+  // Prefix-only key: pass to invalidateQueries to invalidate every dashboard query regardless of period.
+  dashboardAll: ["dashboard"] as const,
   orders: ["orders"] as const,
   ordersBoutique: ["orders", "boutique"] as const,
   order: (id: string) => ["order", id] as const,
