@@ -75,9 +75,55 @@ export async function login(email: string, password: string): Promise<Session> {
   return body as Session;
 }
 
+const COMPRESS_ABOVE_BYTES = 1.5 * 1024 * 1024; // don't bother re-encoding already-reasonable files
+const TARGET_MAX_BYTES = 3 * 1024 * 1024; // aim for 1-3MB, well under Cloudinary's 10MB cap
+const MAX_DIMENSION = 2400; // matches the server-side Cloudinary master cap — no point sending more
+
+// Downscales + re-encodes an oversized image client-side (canvas -> JPEG)
+// before it ever leaves the browser. A 10-12MB phone photo typically lands
+// in the 1-3MB range with no visible quality loss. Falls back to the
+// original file if compression isn't possible (animated GIF, decode
+// failure, etc.) rather than blocking the upload.
+async function compressImage(file: File): Promise<File> {
+  if (file.size <= COMPRESS_ABOVE_BYTES || file.type === "image/gif") {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const width = Math.round(bitmap.width * scale);
+    const height = Math.round(bitmap.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    let quality = 0.88;
+    let blob: Blob | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob || blob.size <= TARGET_MAX_BYTES || quality <= 0.4) break;
+      quality -= 0.12;
+    }
+
+    if (!blob || blob.size >= file.size) return file;
+
+    return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 export async function uploadImage(file: File): Promise<{ url: string }> {
+  const compressed = await compressImage(file);
+
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", compressed);
 
   return apiFetch<{ url: string }>("/admin/uploads", {
     method: "POST",
