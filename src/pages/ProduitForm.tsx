@@ -174,6 +174,15 @@ export default function ProduitForm() {
     setGalleryImages((prev) => prev.filter((img) => img !== url));
   }
 
+  function setAsMainImage(url: string) {
+    setGalleryImages((prev) => {
+      const next = prev.filter((img) => img !== url);
+      if (mainImage) next.unshift(mainImage);
+      return next;
+    });
+    setMainImage(url);
+  }
+
   const submit = useMutation({
     mutationFn: () => {
       const images = [mainImage, ...galleryImages].filter((img): img is string => Boolean(img));
@@ -273,6 +282,13 @@ export default function ProduitForm() {
                 {galleryImages.map((img) => (
                   <div className="image-slot" key={img}>
                     <img src={img} alt="" />
+                    <button
+                      type="button"
+                      className="image-slot-primary"
+                      onClick={() => setAsMainImage(img)}
+                    >
+                      Définir comme principale
+                    </button>
                     <button
                       type="button"
                       className="image-slot-remove"

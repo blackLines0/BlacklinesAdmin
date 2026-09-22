@@ -39,6 +39,13 @@ interface VenteOrder {
   items: { quantite: number; prixUnitaire: number; product: { nom: string; brand: { slug: string; nom: string } } }[];
 }
 
+interface VenteItemInput {
+  productId: string;
+  variantId: string;
+  quantite: string;
+  prixUnitaire: string;
+}
+
 const PAIEMENT_OPTIONS = ["Espèces (boutique)", "Mobile Money (boutique)"];
 
 export default function Ventes() {
@@ -53,48 +60,51 @@ export default function Ventes() {
   const ventes = ventesQuery.data ?? [];
   const loading = productsQuery.isLoading;
 
-  const [productId, setProductId] = useState("");
-  const [variantId, setVariantId] = useState("");
-  const [quantite, setQuantite] = useState("1");
-  const [prixUnitaire, setPrixUnitaire] = useState("");
+  const [items, setItems] = useState<VenteItemInput[]>([
+    { productId: "", variantId: "", quantite: "1", prixUnitaire: "" },
+  ]);
   const [moyenPaiement, setMoyenPaiement] = useState(PAIEMENT_OPTIONS[0]);
   const [showClient, setShowClient] = useState(false);
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const selectedProduct = products.find((p) => p.id === productId) ?? null;
-
   useEffect(() => {
-    setProductId((prev) => prev || products[0]?.id || "");
+    setItems((prev) =>
+      prev.map((item, index) => index === 0 && !item.productId && products[0] ? { ...item, productId: products[0].id } : item),
+    );
   }, [products]);
 
-  useEffect(() => {
-    if (!selectedProduct) return;
-    setPrixUnitaire(String(selectedProduct.prixPromo ?? selectedProduct.prix));
-    const firstInStock = selectedProduct.variants.find((v) => v.stock > 0) ?? selectedProduct.variants[0];
-    setVariantId(firstInStock?.id ?? "");
-  }, [selectedProduct]);
+  function updateItem(index: number, patch: Partial<VenteItemInput>) {
+    setItems((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+  }
 
-  const total = useMemo(() => {
-    const qty = Number(quantite) || 0;
-    const prix = Number(prixUnitaire) || 0;
-    return qty * prix;
-  }, [quantite, prixUnitaire]);
+  function selectProduct(index: number, productId: string) {
+    const product = products.find((p) => p.id === productId);
+    const firstInStock = product?.variants.find((v) => v.stock > 0) ?? product?.variants[0];
+    updateItem(index, {
+      productId,
+      variantId: firstInStock?.id ?? "",
+      prixUnitaire: product ? String(product.prixPromo ?? product.prix) : "",
+    });
+  }
+
+  const total = useMemo(
+    () => items.reduce((sum, item) => sum + (Number(item.quantite) || 0) * (Number(item.prixUnitaire) || 0), 0),
+    [items],
+  );
 
   const submit = useMutation({
     mutationFn: () =>
       apiFetch("/admin/ventes", {
         method: "POST",
         body: JSON.stringify({
-          items: [
-            {
-              productId,
-              variantId: variantId || undefined,
-              quantite: Number(quantite),
-              prixUnitaire: Number(prixUnitaire),
-            },
-          ],
+          items: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId || undefined,
+            quantite: Number(item.quantite),
+            prixUnitaire: Number(item.prixUnitaire),
+          })),
           moyenPaiement,
           client: showClient && (clientNom || clientTelephone)
             ? { nom: clientNom || undefined, telephone: clientTelephone || undefined }
@@ -102,7 +112,7 @@ export default function Ventes() {
         }),
       }),
     onSuccess: () => {
-      setQuantite("1");
+      setItems([{ productId: products[0]?.id ?? "", variantId: "", quantite: "1", prixUnitaire: "" }]);
       setClientNom("");
       setClientTelephone("");
       setShowClient(false);
@@ -118,8 +128,8 @@ export default function Ventes() {
     e.preventDefault();
     setError(null);
 
-    if (!productId || !quantite || !prixUnitaire) {
-      setError("Produit, quantité et prix requis.");
+    if (items.some((item) => !item.productId || !item.quantite || !item.prixUnitaire)) {
+      setError("Chaque ligne doit avoir un produit, une quantité et un prix.");
       return;
     }
 
@@ -148,43 +158,60 @@ export default function Ventes() {
             <p className="cell-muted">Chargement...</p>
           ) : (
             <form onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <div className="field">
-                  <label>Produit</label>
-                  <Combobox
-                    value={productId}
-                    onChange={setProductId}
-                    placeholder="Rechercher un produit..."
-                    options={products.map((p) => ({ value: p.id, label: p.nom, keywords: p.brand.nom }))}
-                  />
-                </div>
-                {selectedProduct && selectedProduct.variants.length ? (
-                  <div className="field">
-                    <label>Taille</label>
-                    <Select
-                      value={variantId}
-                      onChange={setVariantId}
-                      options={selectedProduct.variants.map((v) => ({
-                        value: v.id,
-                        label: `${v.sizeOption.label} (${v.stock} en stock)`,
-                        disabled: v.stock < 1,
-                      }))}
-                    />
+              {items.map((item, index) => {
+                const selectedProduct = products.find((p) => p.id === item.productId) ?? null;
+                return (
+                  <div className="form-grid" key={index} style={{ marginBottom: 12 }}>
+                    <div className="field">
+                      <label>Produit {index + 1}</label>
+                      <Combobox
+                        value={item.productId}
+                        onChange={(value) => selectProduct(index, value)}
+                        placeholder="Rechercher un produit..."
+                        options={products.map((p) => ({ value: p.id, label: p.nom, keywords: p.brand.nom }))}
+                      />
+                    </div>
+                    {selectedProduct && selectedProduct.variants.length ? (
+                      <div className="field">
+                        <label>Taille</label>
+                        <Select
+                          value={item.variantId}
+                          onChange={(value) => updateItem(index, { variantId: value })}
+                          options={selectedProduct.variants.map((v) => ({
+                            value: v.id,
+                            label: `${v.sizeOption.label} (${v.stock} en stock)`,
+                            disabled: v.stock < 1,
+                          }))}
+                        />
+                      </div>
+                    ) : (
+                      <div className="field">
+                        <label>Stock disponible</label>
+                        <input type="text" value={selectedProduct ? `${selectedProduct.stock} en stock` : ""} disabled />
+                      </div>
+                    )}
+                    <div className="field">
+                      <label>Quantité</label>
+                      <input type="number" min={1} value={item.quantite} onChange={(e) => updateItem(index, { quantite: e.target.value })} required />
+                    </div>
+                    <div className="field">
+                      <label>Prix unitaire (FCFA)</label>
+                      <input type="number" min={0} value={item.prixUnitaire} onChange={(e) => updateItem(index, { prixUnitaire: e.target.value })} required />
+                    </div>
+                    {items.length > 1 ? (
+                      <div className="field" style={{ alignSelf: "end" }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}>
+                          Retirer
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ) : (
-                  <div className="field">
-                    <label>Stock disponible</label>
-                    <input type="text" value={selectedProduct ? `${selectedProduct.stock} en stock` : ""} disabled />
-                  </div>
-                )}
-                <div className="field">
-                  <label>Quantité</label>
-                  <input type="number" min={1} value={quantite} onChange={(e) => setQuantite(e.target.value)} required />
-                </div>
-                <div className="field">
-                  <label>Prix unitaire (FCFA)</label>
-                  <input type="number" min={0} value={prixUnitaire} onChange={(e) => setPrixUnitaire(e.target.value)} required />
-                </div>
+                );
+              })}
+              <button type="button" className="btn btn-outline" onClick={() => setItems((prev) => [...prev, { productId: "", variantId: "", quantite: "1", prixUnitaire: "" }])}>
+                + Ajouter un produit
+              </button>
+              <div className="form-grid" style={{ marginTop: 12 }}>
                 <div className="field">
                   <label>Moyen de paiement</label>
                   <Select
