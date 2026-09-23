@@ -97,7 +97,7 @@ export default function Commandes() {
       { label: "Commande", value: (o) => `#${o.id.slice(-6).toUpperCase()}` },
       { label: "Client", value: (o) => o.customer.nom },
       { label: "Date", value: (o) => formatDate(o.createdAt) },
-      { label: "Marque", value: (o) => o.items[0]?.product.brand.nom ?? "" },
+      { label: "Marque", value: (o) => [...new Set(o.items.map((it) => it.product.brand.nom))].join(", ") },
       { label: "Canal", value: (o) => CANAL_LABELS[o.canal] },
       { label: "Paiement", value: (o) => o.moyenPaiement },
       { label: "Montant", value: (o) => o.montantTotal },
@@ -177,13 +177,32 @@ export default function Commandes() {
               </thead>
               <tbody>
                 {filtered.map((order) => {
-                  const brand = order.items[0]?.product.brand;
+                  const brands = Array.from(
+                    new Map(order.items.map((it) => [it.product.brand.slug, it.product.brand])).values(),
+                  );
                   return (
                     <tr key={order.id}>
                       <td className="cell-primary">#{order.id.slice(-6).toUpperCase()}</td>
                       <td>{order.customer.nom}</td>
                       <td className="cell-muted">{formatDate(order.createdAt)}</td>
-                      <td>{brand ? <span className={`brand-tag ${brandTagClass(brand.slug)}`}>{brand.nom}</span> : "—"}</td>
+                      <td>
+                        {brands.length === 0 ? (
+                          "—"
+                        ) : (
+                          <div className="brand-avatar-stack">
+                            {brands.map((b, i) => (
+                              <span
+                                key={b.slug}
+                                className={`brand-avatar ${brandTagClass(b.slug)}`}
+                                style={{ zIndex: i + 1 }}
+                                title={b.nom}
+                              >
+                                {b.nom.charAt(0).toUpperCase()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <span className={`badge ${order.canal === "boutique" ? "info" : "neutral"}`}>
                           {CANAL_LABELS[order.canal]}
