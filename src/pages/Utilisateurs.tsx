@@ -68,7 +68,7 @@ export default function Utilisateurs() {
   const [inviteRole, setInviteRole] = useState<UserRole>("gestionnaire");
   const [inviteBrands, setInviteBrands] = useState<string[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ email: string } | null>(null);
 
   const filtered = tab === "all" ? users : users.filter((u) => u.role === tab);
 
@@ -95,7 +95,7 @@ export default function Utilisateurs() {
 
   const invite = useMutation({
     mutationFn: () =>
-      apiFetch<{ user: User; tempPassword: string }>("/admin/users", {
+      apiFetch<{ user: User }>("/admin/users", {
         method: "POST",
         body: JSON.stringify({
           email: inviteEmail,
@@ -105,7 +105,7 @@ export default function Utilisateurs() {
         }),
       }),
     onSuccess: (result) => {
-      setInviteResult({ email: result.user.email, tempPassword: result.tempPassword });
+      setInviteResult({ email: result.user.email });
       setInviteEmail("");
       setInviteNom("");
       setInviteRole("gestionnaire");
@@ -139,17 +139,14 @@ export default function Utilisateurs() {
       {showInvite ? (
         <div className="panel" style={{ marginBottom: 20 }}>
           <div className="panel-head">
-            <div><h3>Inviter un utilisateur</h3><div className="sub">Un mot de passe temporaire sera généré à transmettre manuellement</div></div>
+            <div><h3>Inviter un utilisateur</h3><div className="sub">Un mot de passe temporaire sera généré et envoyé automatiquement par email</div></div>
           </div>
           <div className="panel-body">
             {inviteResult ? (
               <div>
-                <p style={{ fontSize: 13.5, marginBottom: 10 }}>
-                  Compte créé pour <strong>{inviteResult.email}</strong>. Transmets ce mot de passe temporaire :
+                <p style={{ fontSize: 13.5, marginBottom: 16 }}>
+                  Compte créé pour <strong>{inviteResult.email}</strong>. Ses identifiants de connexion (mot de passe temporaire) lui ont été envoyés automatiquement par email.
                 </p>
-                <code style={{ display: "inline-block", background: "var(--bg)", padding: "8px 12px", borderRadius: 8, fontSize: 13.5, marginBottom: 16 }}>
-                  {inviteResult.tempPassword}
-                </code>
                 <div className="form-actions">
                   <button className="btn btn-outline" onClick={closeInvite}>Fermer</button>
                 </div>
