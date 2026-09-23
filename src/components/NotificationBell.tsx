@@ -93,7 +93,14 @@ export function NotificationBell() {
       if (panelRef.current?.contains(target)) return;
       setOpen(false);
     }
-    function handleScrollOrResize() {
+    function handleScrollOrResize(e: Event) {
+      // Native `scroll` events don't bubble, so this capture-phase listener is
+      // the only way `window` sees scrolling inside the panel itself (which
+      // has its own overflow-y:auto). Without this check, the very first
+      // scroll gesture inside the list closed the panel instead of scrolling it.
+      if (e.type === "scroll" && panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) {
+        return;
+      }
       setOpen(false);
     }
 
