@@ -67,19 +67,21 @@ export function Select({ value, onChange, options, placeholder, size = "md", cla
       if (listRef.current?.contains(target)) return;
       setOpen(false);
     }
-    function handleScrollOrResize() {
+    function handleScroll(e: Event) {
+      if (e.target instanceof Node && listRef.current?.contains(e.target)) return;
+      setOpen(false);
+    }
+    function handleResize() {
       setOpen(false);
     }
 
     document.addEventListener("mousedown", handlePointerDown);
-    // A dropdown positioned via fixed coordinates would go stale on scroll —
-    // closing is simpler and safer than trying to keep it glued to the trigger.
-    window.addEventListener("scroll", handleScrollOrResize, true);
-    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("scroll", handleScrollOrResize, true);
-      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, [open]);
 

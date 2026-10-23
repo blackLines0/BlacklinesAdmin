@@ -55,17 +55,21 @@ export function Combobox({ value, onChange, options, placeholder, emptyLabel }: 
       setOpen(false);
       setQuery(options.find((o) => o.value === value)?.label ?? "");
     }
-    function handleScrollOrResize() {
+    function handleScroll(e: Event) {
+      if (e.target instanceof Node && listRef.current?.contains(e.target)) return;
+      setOpen(false);
+    }
+    function handleResize() {
       setOpen(false);
     }
 
     document.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("scroll", handleScrollOrResize, true);
-    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("scroll", handleScrollOrResize, true);
-      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, value]);
