@@ -210,6 +210,9 @@ thead th{
 }
 tbody td{padding:15px 22px; border-bottom:1px solid var(--line-soft); vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
+.table-nowrap th, .table-nowrap td{white-space:nowrap;}
+.table-nowrap thead th, .table-nowrap tbody td{padding-left:14px; padding-right:14px;}
+.table-nowrap thead th:first-child, .table-nowrap tbody td:first-child{padding-left:22px;}
 tbody tr:hover{background:#FBFCFE;}
 .cell-primary{font-weight:600;}
 .cell-muted{color:var(--muted);}
@@ -233,6 +236,8 @@ tbody tr:hover{background:#FBFCFE;}
 .brand-tag.capsule{background:#F1EAFB; color:#44199E;}
 .brand-tag.spicy{background:#FFF7CA; color:#053085;}
 .brand-tag.rihan{background:#F9E5B2; color:#083D21;}
+.brand-tag.artmoir{background:#F7ECE8; color:#924933;}
+.brand-tag.spicy-kids{background:#F1E7F5; color:#7A4B91;}
 
 /* brand avatar stack — overlapping circles, one per distinct brand in a row */
 .brand-avatar-stack{display:flex; align-items:center;}
@@ -246,6 +251,8 @@ tbody tr:hover{background:#FBFCFE;}
 .brand-avatar.capsule{background:var(--danger);}
 .brand-avatar.spicy{background:var(--warning);}
 .brand-avatar.rihan{background:var(--success);}
+.brand-avatar.artmoir{background:#BB5D42;}
+.brand-avatar.spicy-kids{background:#A472BA;}
 
 /* ---------- BUTTONS ---------- */
 .btn{
@@ -261,6 +268,8 @@ tbody tr:hover{background:#FBFCFE;}
 .icon-action{width:30px; height:30px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; color:var(--muted);}
 .icon-action:hover{background:var(--bg); color:var(--ink);}
 .icon-action svg{width:15px; height:15px;}
+.icon-action.disabled{opacity:0.45; cursor:not-allowed;}
+.icon-action.disabled:hover{background:none; color:var(--muted);}
 
 /* ---------- FILTER BAR ---------- */
 .filter-bar{display:flex; align-items:center; gap:10px; padding:16px 22px; background:var(--bg); border-bottom:1px solid var(--line); flex-wrap:wrap;}

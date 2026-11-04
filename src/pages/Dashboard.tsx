@@ -38,6 +38,8 @@ const BRAND_COLORS: Record<string, string> = {
   "capsule-textile": "#44199E",
   spicysoul: "#053085",
   "rihan-wa-harir": "#083D21",
+  artmoir: "#BB5D42",
+  "spicy-kids": "#A472BA",
 };
 
 function donutSegments(parts: { pct: number; slug: string }[]) {

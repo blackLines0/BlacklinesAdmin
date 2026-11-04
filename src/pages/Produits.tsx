@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
 import { useConfirm } from "../components/ConfirmModal";
-import { apiFetch } from "../lib/api";
+import { apiFetch, siteProductUrl } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import {
   brandTagClass,
@@ -31,6 +31,7 @@ interface Brand {
 
 interface Product {
   id: string;
+  slug: string;
   nom: string;
   prix: number;
   prixPromo: number | null;
@@ -197,6 +198,22 @@ export default function Produits() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: 4 }}>
+                        {product.visible ? (
+                          <a
+                            className="icon-action"
+                            aria-label="Voir sur le site"
+                            title="Voir sur le site"
+                            href={siteProductUrl(product.brand.slug, product.slug)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                          </a>
+                        ) : (
+                          <span className="icon-action disabled" aria-label="Produit masqué, non visible sur le site" title="Produit masqué, non visible sur le site">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /><line x1="3" y1="3" x2="21" y2="21" /></svg>
+                          </span>
+                        )}
                         <Link className="icon-action" aria-label="Modifier" to={`/produits/${product.id}/modifier`}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </Link>

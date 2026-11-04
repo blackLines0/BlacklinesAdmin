@@ -1,5 +1,14 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { clearSession, getSession, login as apiLogin, setSession, type SessionUser } from "../lib/api";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  clearSession,
+  getSession,
+  login as apiLogin,
+  setSession,
+  setSessionExpiredHandler,
+  tokenExpiresAt,
+  type SessionUser,
+} from "../lib/api";
+import { queryClient } from "../lib/queryClient";
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -12,6 +21,27 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(() => getSession()?.user ?? null);
+
+  // ProtectedRoute sends the user to /login as soon as `user` is null.
+  const expireSession = useCallback(() => {
+    clearSession();
+    setUser(null);
+    queryClient.clear();
+  }, []);
+
+  useEffect(() => {
+    setSessionExpiredHandler(expireSession);
+    return () => setSessionExpiredHandler(null);
+  }, [expireSession]);
+
+  useEffect(() => {
+    const token = getSession()?.token;
+    const expiresAt = token ? tokenExpiresAt(token) : null;
+    if (!user || expiresAt === null) return;
+
+    const timer = window.setTimeout(expireSession, expiresAt - Date.now());
+    return () => window.clearTimeout(timer);
+  }, [user, expireSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

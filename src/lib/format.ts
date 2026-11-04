@@ -37,6 +37,8 @@ export function brandTagClass(slug: string): string {
   if (slug === "capsule-textile") return "capsule";
   if (slug === "spicysoul") return "spicy";
   if (slug === "rihan-wa-harir") return "rihan";
+  if (slug === "artmoir") return "artmoir";
+  if (slug === "spicy-kids") return "spicy-kids";
   return "";
 }
 

@@ -161,7 +161,7 @@ export default function Commandes() {
           <div className="panel-body"><p style={{ color: "var(--danger)" }}>{error instanceof Error ? error.message : "Erreur de chargement"}</p></div>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="table-nowrap">
               <thead>
                 <tr>
                   <th>Commande</th>

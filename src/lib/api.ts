@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+const SITE_URL = import.meta.env.VITE_SITE_URL ?? "https://www.blallery.com";
 const SESSION_KEY = "blacklines_admin_session";
 
 export interface SessionUser {
@@ -14,12 +15,35 @@ interface Session {
   user: SessionUser;
 }
 
+let sessionExpiredHandler: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  sessionExpiredHandler = handler;
+}
+
+// The JWT's own expiry, so the app can leave before the API starts refusing.
+export function tokenExpiresAt(token: string): number | null {
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const { exp } = JSON.parse(atob(payload)) as { exp?: number };
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getSession(): Session | null {
   const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as Session;
+    const session = JSON.parse(raw) as Session;
+    const expiresAt = tokenExpiresAt(session.token);
+    if (expiresAt !== null && expiresAt <= Date.now()) {
+      clearSession();
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -47,6 +71,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
 
+  if (res.status === 401) {
+    sessionExpiredHandler?.();
+    throw new Error("Session expirée, veuillez vous reconnecter.");
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `API error ${res.status}: ${path}`);
@@ -57,6 +86,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   return res.json() as Promise<T>;
+}
+
+export function siteProductUrl(brandSlug: string, productSlug: string): string {
+  return `${SITE_URL}/${brandSlug}/${productSlug}`;
 }
 
 export async function login(email: string, password: string): Promise<Session> {
@@ -136,6 +169,11 @@ export async function downloadInvoice(orderId: string): Promise<void> {
   const res = await fetch(`${API_URL}/admin/orders/${orderId}/invoice`, {
     headers: session?.token ? { Authorization: `Bearer ${session.token}` } : undefined,
   });
+
+  if (res.status === 401) {
+    sessionExpiredHandler?.();
+    throw new Error("Session expirée, veuillez vous reconnecter.");
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
