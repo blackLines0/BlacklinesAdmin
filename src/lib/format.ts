@@ -105,6 +105,8 @@ export interface PaymentAttempt {
   referencePaygate: string | null;
   referenceOperateur: string | null;
   anomalie: string | null;
+  // PayGate's last answer about this attempt, kept for diagnosis.
+  reponsePaygate: Record<string, unknown> | null;
   payeLe: string | null;
   createdAt: string;
 }
