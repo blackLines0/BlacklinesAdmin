@@ -200,6 +200,14 @@ export default function CommandeDetail() {
                         <td className="cell-muted" style={{ fontSize: 12 }}>
                           <div>PayGate : {p.referencePaygate ?? "—"}</div>
                           <div>Opérateur : {p.referenceOperateur ?? "—"}</div>
+                          {p.reponsePaygate ? (
+                            <details style={{ marginTop: 4 }}>
+                              <summary style={{ cursor: "pointer" }}>Réponse PayGate</summary>
+                              <pre style={{ margin: "6px 0 0", fontSize: 11, whiteSpace: "pre-wrap", maxWidth: 260 }}>
+                                {JSON.stringify(p.reponsePaygate, null, 1)}
+                              </pre>
+                            </details>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
