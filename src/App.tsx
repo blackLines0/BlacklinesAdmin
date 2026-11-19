@@ -7,6 +7,7 @@ import CodesPromo from "./pages/CodesPromo";
 import Commandes from "./pages/Commandes";
 import CommandeDetail from "./pages/CommandeDetail";
 import Dashboard from "./pages/Dashboard";
+import Fidelite from "./pages/Fidelite";
 import Login from "./pages/Login";
 import MarqueDetail from "./pages/MarqueDetail";
 import Marques from "./pages/Marques";
@@ -34,6 +35,7 @@ function App() {
       <Route path="/utilisateurs" element={<ProtectedRoute roles={["admin"]}><Utilisateurs /></ProtectedRoute>} />
       <Route path="/avis" element={<ProtectedRoute roles={["admin", "support"]}><Avis /></ProtectedRoute>} />
       <Route path="/codes-promo" element={<ProtectedRoute roles={["admin"]}><CodesPromo /></ProtectedRoute>} />
+      <Route path="/fidelite" element={<ProtectedRoute roles={["admin"]}><Fidelite /></ProtectedRoute>} />
       <Route path="/vitrine" element={<ProtectedRoute roles={["admin"]}><Vitrine /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

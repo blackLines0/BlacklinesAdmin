@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch } from "../lib/api";
 import { exportToCsv } from "../lib/csvExport";
 import { queryKeys } from "../lib/queryKeys";
@@ -11,8 +12,11 @@ import {
   formatDate,
   formatPrice,
   ORDER_STATUS_LABELS,
+  paymentFlag,
   statusBadgeClass,
+  statusChangeQuestion,
   type OrderStatus,
+  type PaymentAttempt,
 } from "../lib/format";
 
 interface OrderItem {
@@ -31,6 +35,7 @@ interface Order {
   createdAt: string;
   customer: { nom: string };
   items: OrderItem[];
+  payments: Pick<PaymentAttempt, "statut" | "anomalie">[];
 }
 
 const CANAL_LABELS: Record<Order["canal"], string> = {
@@ -59,6 +64,7 @@ export default function Commandes() {
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   const [canalTab, setCanalTab] = useState<Order["canal"] | "all">("all");
   const [search, setSearch] = useState("");
+  const confirm = useConfirm();
 
   const updateStatus = useMutation({
     mutationFn: ({ id, statut }: { id: string; statut: OrderStatus }) =>
@@ -76,6 +82,15 @@ export default function Commandes() {
       alert(err instanceof Error ? err.message : "Échec de la mise à jour");
     },
   });
+
+  async function changeStatus(order: Order, statut: OrderStatus) {
+    if (statut === order.statut) return;
+    const confirmed = await confirm(statusChangeQuestion(order.id, order.statut, statut), {
+      confirmLabel: "Confirmer",
+      danger: statut === "annulee",
+    });
+    if (confirmed) updateStatus.mutate({ id: order.id, statut });
+  }
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { en_attente: 0, payee: 0, expediee: 0, livree: 0, annulee: 0 };
@@ -180,6 +195,7 @@ export default function Commandes() {
                   const brands = Array.from(
                     new Map(order.items.map((it) => [it.product.brand.slug, it.product.brand])).values(),
                   );
+                  const flag = paymentFlag(order.payments);
                   return (
                     <tr key={order.id}>
                       <td className="cell-primary">#{order.id.slice(-6).toUpperCase()}</td>
@@ -208,13 +224,16 @@ export default function Commandes() {
                           {CANAL_LABELS[order.canal]}
                         </span>
                       </td>
-                      <td className="cell-muted">{order.moyenPaiement}</td>
+                      <td className="cell-muted">
+                        {order.moyenPaiement}
+                        {flag ? <span className={`badge ${flag.tone}`} style={{ marginLeft: 8 }}>{flag.label}</span> : null}
+                      </td>
                       <td className="cell-primary">{formatPrice(order.montantTotal)}</td>
                       <td>
                         <Select
                           size="sm"
                           value={order.statut}
-                          onChange={(v) => updateStatus.mutate({ id: order.id, statut: v as OrderStatus })}
+                          onChange={(v) => changeStatus(order, v as OrderStatus)}
                           options={STATUS_SELECT_OPTIONS}
                         />
                       </td>

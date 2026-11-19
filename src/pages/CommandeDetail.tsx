@@ -3,14 +3,21 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch, downloadInvoice, sendInvoiceEmail } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import {
   formatDate,
   formatPrice,
+  NETWORK_LABELS,
   ORDER_STATUS_LABELS,
+  PAYMENT_ANOMALY_LABELS,
+  PAYMENT_STATUS_LABELS,
+  paymentBadgeClass,
   statusBadgeClass,
+  statusChangeQuestion,
   type OrderStatus,
+  type PaymentAttempt,
 } from "../lib/format";
 
 interface OrderItem {
@@ -25,10 +32,15 @@ interface Order {
   id: string;
   statut: OrderStatus;
   montantTotal: number;
+  remise: number;
+  zoneLivraison: "lome" | "hors_lome" | null;
+  // Included in montantTotal; null outside Lomé (collected by the courier).
+  fraisLivraison: number | null;
   moyenPaiement: string;
   createdAt: string;
   customer: { nom: string; email: string | null; telephone: string; adresse: string | null };
   items: OrderItem[];
+  payments: PaymentAttempt[];
 }
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
@@ -43,6 +55,7 @@ export default function CommandeDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statut, setStatut] = useState<OrderStatus>("en_attente");
+  const confirm = useConfirm();
 
   const { data: order, isLoading: loading, isError: notFound } = useQuery({
     queryKey: queryKeys.order(id!),
@@ -129,7 +142,72 @@ export default function CommandeDetail() {
               <div className="detail-row"><span className="label">Adresse</span><span className="value">{order.customer.adresse}</span></div>
             ) : null}
             <div className="detail-row"><span className="label">Moyen de paiement</span><span className="value">{order.moyenPaiement}</span></div>
+            {order.zoneLivraison ? (
+              <div className="detail-row">
+                <span className="label">Livraison</span>
+                <span className="value">
+                  {order.zoneLivraison === "lome" ? "Lomé" : "Hors de Lomé · frais à encaisser à la livraison"}
+                </span>
+              </div>
+            ) : null}
           </div>
+
+          {order.payments.length > 0 ? (
+            <>
+              <div className="panel-head" style={{ borderTop: "1px solid var(--line)" }}>
+                <div>
+                  <h3>Paiements mobile money</h3>
+                  <div className="sub">
+                    {order.payments.length} tentative{order.payments.length > 1 ? "s" : ""} via PayGate · montants frais de réseau compris
+                  </div>
+                </div>
+              </div>
+              {order.payments
+                .filter((p) => p.anomalie)
+                .map((p) => (
+                  <div className="panel-body" key={`anomalie-${p.id}`} style={{ paddingBottom: 0 }}>
+                    <span className={`badge ${p.statut === "reussi" ? "danger" : "warning"}`}>
+                      {PAYMENT_ANOMALY_LABELS[p.anomalie!] ?? p.anomalie} · {formatPrice(p.montant)} le {formatDate(p.payeLe ?? p.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              <div className="table-wrap">
+                <table className="table-nowrap">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Statut</th>
+                      <th>Numéro</th>
+                      <th>Titulaire</th>
+                      <th>Montant</th>
+                      <th>Références</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.payments.map((p) => (
+                      <tr key={p.id}>
+                        <td className="cell-muted">{formatDate(p.createdAt)}</td>
+                        <td><span className={`badge ${paymentBadgeClass(p.statut)}`}>{PAYMENT_STATUS_LABELS[p.statut]}</span></td>
+                        <td>
+                          <div className="cell-primary">{p.telephone}</div>
+                          <div className="cell-muted" style={{ fontSize: 12 }}>{NETWORK_LABELS[p.reseau]}</div>
+                        </td>
+                        <td>{p.nomPayeur}</td>
+                        <td>
+                          <div className="cell-primary">{formatPrice(p.montant)}</div>
+                          <div className="cell-muted" style={{ fontSize: 12 }}>dont {formatPrice(p.frais)} de frais</div>
+                        </td>
+                        <td className="cell-muted" style={{ fontSize: 12 }}>
+                          <div>PayGate : {p.referencePaygate ?? "—"}</div>
+                          <div>Opérateur : {p.referenceOperateur ?? "—"}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="panel">
@@ -141,12 +219,39 @@ export default function CommandeDetail() {
             </div>
 
             <div style={{ marginTop: 22 }}>
-              <div className="detail-row"><span className="label">Sous-total</span><span className="value">{formatPrice(order.montantTotal)}</span></div>
+              <div className="detail-row">
+                <span className="label">Sous-total</span>
+                <span className="value">{formatPrice(order.montantTotal + order.remise - (order.fraisLivraison ?? 0))}</span>
+              </div>
+              {order.remise > 0 ? (
+                <div className="detail-row"><span className="label">Remise</span><span className="value">−{formatPrice(order.remise)}</span></div>
+              ) : null}
+              {order.zoneLivraison ? (
+                <div className="detail-row">
+                  <span className="label">Livraison</span>
+                  <span className="value">
+                    {order.zoneLivraison === "hors_lome" ? "À encaisser" : order.fraisLivraison ? formatPrice(order.fraisLivraison) : "Offerte (mardi)"}
+                  </span>
+                </div>
+              ) : null}
               <div className="detail-row"><span className="label">Total</span><span className="value">{formatPrice(order.montantTotal)}</span></div>
             </div>
 
             <div className="form-actions">
-              <button className="btn btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (statut !== order.statut) {
+                    const confirmed = await confirm(statusChangeQuestion(order.id, order.statut, statut), {
+                      confirmLabel: "Confirmer",
+                      danger: statut === "annulee",
+                    });
+                    if (!confirmed) return;
+                  }
+                  save.mutate();
+                }}
+                disabled={save.isPending}
+              >
                 {save.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>

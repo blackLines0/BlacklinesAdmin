@@ -18,6 +18,8 @@ export const queryKeys = {
   reviews: ["reviews"] as const,
   users: ["users"] as const,
   promoCodes: ["promo-codes"] as const,
+  loyaltyPrograms: ["loyalty-programs"] as const,
+  loyaltyRewards: ["loyalty-rewards"] as const,
   heroSlides: ["hero-slides"] as const,
   announcement: ["announcement"] as const,
   notifications: ["notifications"] as const,

@@ -138,6 +138,17 @@ const SECONDARY_NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/fidelite",
+    label: "Fidélité",
+    roles: ["admin"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="8" width="18" height="13" rx="1.5" /><path d="M12 8v13" /><path d="M3 12h18" />
+        <path d="M12 8c-1.5-3-5-4-5-1.5S10 8 12 8Zm0 0c1.5-3 5-4 5-1.5S14 8 12 8Z" />
+      </svg>
+    ),
+  },
+  {
     href: "/vitrine",
     label: "Vitrine",
     roles: ["admin"],
