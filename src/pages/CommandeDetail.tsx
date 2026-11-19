@@ -32,6 +32,10 @@ interface Order {
   id: string;
   statut: OrderStatus;
   montantTotal: number;
+  remise: number;
+  zoneLivraison: "lome" | "hors_lome" | null;
+  // Included in montantTotal; null outside Lomé (collected by the courier).
+  fraisLivraison: number | null;
   moyenPaiement: string;
   createdAt: string;
   customer: { nom: string; email: string | null; telephone: string; adresse: string | null };
@@ -138,6 +142,14 @@ export default function CommandeDetail() {
               <div className="detail-row"><span className="label">Adresse</span><span className="value">{order.customer.adresse}</span></div>
             ) : null}
             <div className="detail-row"><span className="label">Moyen de paiement</span><span className="value">{order.moyenPaiement}</span></div>
+            {order.zoneLivraison ? (
+              <div className="detail-row">
+                <span className="label">Livraison</span>
+                <span className="value">
+                  {order.zoneLivraison === "lome" ? "Lomé" : "Hors de Lomé · frais à encaisser à la livraison"}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {order.payments.length > 0 ? (
@@ -207,7 +219,21 @@ export default function CommandeDetail() {
             </div>
 
             <div style={{ marginTop: 22 }}>
-              <div className="detail-row"><span className="label">Sous-total</span><span className="value">{formatPrice(order.montantTotal)}</span></div>
+              <div className="detail-row">
+                <span className="label">Sous-total</span>
+                <span className="value">{formatPrice(order.montantTotal + order.remise - (order.fraisLivraison ?? 0))}</span>
+              </div>
+              {order.remise > 0 ? (
+                <div className="detail-row"><span className="label">Remise</span><span className="value">−{formatPrice(order.remise)}</span></div>
+              ) : null}
+              {order.zoneLivraison ? (
+                <div className="detail-row">
+                  <span className="label">Livraison</span>
+                  <span className="value">
+                    {order.zoneLivraison === "hors_lome" ? "À encaisser" : order.fraisLivraison ? formatPrice(order.fraisLivraison) : "Offerte (mardi)"}
+                  </span>
+                </div>
+              ) : null}
               <div className="detail-row"><span className="label">Total</span><span className="value">{formatPrice(order.montantTotal)}</span></div>
             </div>
 
