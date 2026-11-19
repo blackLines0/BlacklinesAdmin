@@ -150,3 +150,8 @@ export function paymentFlag(payments: Pick<PaymentAttempt, "statut" | "anomalie"
   if (payments.some((p) => p.anomalie === "non_confirme")) return { label: "À vérifier", tone: "warning" };
   return null;
 }
+
+// The question asked before an order's status changes, from the list or the detail page.
+export function statusChangeQuestion(orderId: string, from: OrderStatus, to: OrderStatus): string {
+  return `Passer la commande #${orderId.slice(-6).toUpperCase()} de « ${ORDER_STATUS_LABELS[from]} » à « ${ORDER_STATUS_LABELS[to]} » ?`;
+}

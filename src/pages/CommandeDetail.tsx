@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "../components/AdminLayout";
 import { Select, type SelectOption } from "../components/Select";
+import { useConfirm } from "../components/ConfirmModal";
 import { apiFetch, downloadInvoice, sendInvoiceEmail } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import {
@@ -14,6 +15,7 @@ import {
   PAYMENT_STATUS_LABELS,
   paymentBadgeClass,
   statusBadgeClass,
+  statusChangeQuestion,
   type OrderStatus,
   type PaymentAttempt,
 } from "../lib/format";
@@ -49,6 +51,7 @@ export default function CommandeDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statut, setStatut] = useState<OrderStatus>("en_attente");
+  const confirm = useConfirm();
 
   const { data: order, isLoading: loading, isError: notFound } = useQuery({
     queryKey: queryKeys.order(id!),
@@ -209,7 +212,20 @@ export default function CommandeDetail() {
             </div>
 
             <div className="form-actions">
-              <button className="btn btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (statut !== order.statut) {
+                    const confirmed = await confirm(statusChangeQuestion(order.id, order.statut, statut), {
+                      confirmLabel: "Confirmer",
+                      danger: statut === "annulee",
+                    });
+                    if (!confirmed) return;
+                  }
+                  save.mutate();
+                }}
+                disabled={save.isPending}
+              >
                 {save.isPending ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
