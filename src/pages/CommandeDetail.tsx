@@ -8,9 +8,14 @@ import { queryKeys } from "../lib/queryKeys";
 import {
   formatDate,
   formatPrice,
+  NETWORK_LABELS,
   ORDER_STATUS_LABELS,
+  PAYMENT_ANOMALY_LABELS,
+  PAYMENT_STATUS_LABELS,
+  paymentBadgeClass,
   statusBadgeClass,
   type OrderStatus,
+  type PaymentAttempt,
 } from "../lib/format";
 
 interface OrderItem {
@@ -29,6 +34,7 @@ interface Order {
   createdAt: string;
   customer: { nom: string; email: string | null; telephone: string; adresse: string | null };
   items: OrderItem[];
+  payments: PaymentAttempt[];
 }
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS) as [OrderStatus, string][];
@@ -130,6 +136,63 @@ export default function CommandeDetail() {
             ) : null}
             <div className="detail-row"><span className="label">Moyen de paiement</span><span className="value">{order.moyenPaiement}</span></div>
           </div>
+
+          {order.payments.length > 0 ? (
+            <>
+              <div className="panel-head" style={{ borderTop: "1px solid var(--line)" }}>
+                <div>
+                  <h3>Paiements mobile money</h3>
+                  <div className="sub">
+                    {order.payments.length} tentative{order.payments.length > 1 ? "s" : ""} via PayGate · montants frais de réseau compris
+                  </div>
+                </div>
+              </div>
+              {order.payments
+                .filter((p) => p.anomalie)
+                .map((p) => (
+                  <div className="panel-body" key={`anomalie-${p.id}`} style={{ paddingBottom: 0 }}>
+                    <span className={`badge ${p.statut === "reussi" ? "danger" : "warning"}`}>
+                      {PAYMENT_ANOMALY_LABELS[p.anomalie!] ?? p.anomalie} · {formatPrice(p.montant)} le {formatDate(p.payeLe ?? p.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              <div className="table-wrap">
+                <table className="table-nowrap">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Statut</th>
+                      <th>Numéro</th>
+                      <th>Titulaire</th>
+                      <th>Montant</th>
+                      <th>Références</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.payments.map((p) => (
+                      <tr key={p.id}>
+                        <td className="cell-muted">{formatDate(p.createdAt)}</td>
+                        <td><span className={`badge ${paymentBadgeClass(p.statut)}`}>{PAYMENT_STATUS_LABELS[p.statut]}</span></td>
+                        <td>
+                          <div className="cell-primary">{p.telephone}</div>
+                          <div className="cell-muted" style={{ fontSize: 12 }}>{NETWORK_LABELS[p.reseau]}</div>
+                        </td>
+                        <td>{p.nomPayeur}</td>
+                        <td>
+                          <div className="cell-primary">{formatPrice(p.montant)}</div>
+                          <div className="cell-muted" style={{ fontSize: 12 }}>dont {formatPrice(p.frais)} de frais</div>
+                        </td>
+                        <td className="cell-muted" style={{ fontSize: 12 }}>
+                          <div>PayGate : {p.referencePaygate ?? "—"}</div>
+                          <div>Opérateur : {p.referenceOperateur ?? "—"}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="panel">

@@ -11,8 +11,10 @@ import {
   formatDate,
   formatPrice,
   ORDER_STATUS_LABELS,
+  paymentFlag,
   statusBadgeClass,
   type OrderStatus,
+  type PaymentAttempt,
 } from "../lib/format";
 
 interface OrderItem {
@@ -31,6 +33,7 @@ interface Order {
   createdAt: string;
   customer: { nom: string };
   items: OrderItem[];
+  payments: Pick<PaymentAttempt, "statut" | "anomalie">[];
 }
 
 const CANAL_LABELS: Record<Order["canal"], string> = {
@@ -180,6 +183,7 @@ export default function Commandes() {
                   const brands = Array.from(
                     new Map(order.items.map((it) => [it.product.brand.slug, it.product.brand])).values(),
                   );
+                  const flag = paymentFlag(order.payments);
                   return (
                     <tr key={order.id}>
                       <td className="cell-primary">#{order.id.slice(-6).toUpperCase()}</td>
@@ -208,7 +212,10 @@ export default function Commandes() {
                           {CANAL_LABELS[order.canal]}
                         </span>
                       </td>
-                      <td className="cell-muted">{order.moyenPaiement}</td>
+                      <td className="cell-muted">
+                        {order.moyenPaiement}
+                        {flag ? <span className={`badge ${flag.tone}`} style={{ marginLeft: 8 }}>{flag.label}</span> : null}
+                      </td>
                       <td className="cell-primary">{formatPrice(order.montantTotal)}</td>
                       <td>
                         <Select

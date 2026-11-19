@@ -90,3 +90,63 @@ export function avatarColor(seed: string): string {
   }
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]!;
 }
+
+export type PaymentStatus = "en_attente" | "reussi" | "echoue" | "expire" | "annule";
+
+// One mobile money prompt sent through PayGate (see Backend Payment model).
+export interface PaymentAttempt {
+  id: string;
+  statut: PaymentStatus;
+  montant: number;
+  frais: number;
+  telephone: string;
+  reseau: "flooz" | "tmoney";
+  nomPayeur: string;
+  referencePaygate: string | null;
+  referenceOperateur: string | null;
+  anomalie: string | null;
+  payeLe: string | null;
+  createdAt: string;
+}
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  en_attente: "En attente",
+  reussi: "Payé",
+  echoue: "Échoué",
+  expire: "Expiré",
+  annule: "Annulé",
+};
+
+export const NETWORK_LABELS: Record<PaymentAttempt["reseau"], string> = {
+  flooz: "Flooz",
+  tmoney: "T-Money",
+};
+
+export const PAYMENT_ANOMALY_LABELS: Record<string, string> = {
+  montant_incorrect: "Montant différent du total, à rembourser",
+  double_paiement: "Commande déjà payée, à rembourser",
+  commande_annulee: "Commande annulée, à rembourser",
+  non_confirme: "Jamais confirmé par PayGate, à vérifier sur son tableau de bord",
+};
+
+export function paymentBadgeClass(statut: PaymentStatus): string {
+  switch (statut) {
+    case "reussi":
+      return "success";
+    case "en_attente":
+      return "warning";
+    case "echoue":
+    case "annule":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
+
+// What the orders list flags: money PayGate took that the order could not
+// take (to refund), or an attempt PayGate never answered for (to check).
+export function paymentFlag(payments: Pick<PaymentAttempt, "statut" | "anomalie">[] = []): { label: string; tone: string } | null {
+  if (payments.some((p) => p.statut === "reussi" && p.anomalie)) return { label: "À rembourser", tone: "danger" };
+  if (payments.some((p) => p.anomalie === "non_confirme")) return { label: "À vérifier", tone: "warning" };
+  return null;
+}
