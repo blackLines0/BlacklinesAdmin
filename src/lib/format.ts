@@ -128,8 +128,13 @@ export const PAYMENT_ANOMALY_LABELS: Record<string, string> = {
   montant_incorrect: "Montant différent du total, à rembourser",
   double_paiement: "Commande déjà payée, à rembourser",
   commande_annulee: "Commande annulée, à rembourser",
-  non_confirme: "Jamais confirmé par PayGate, à vérifier sur son tableau de bord",
 };
+
+// An attempt failed for lack of confirmation within a minute: an everyday
+// abandoned prompt, not an anomaly. A late confirmation still pays it.
+export function isUnconfirmed(p: Pick<PaymentAttempt, "anomalie">): boolean {
+  return p.anomalie === "non_confirme";
+}
 
 export function paymentBadgeClass(statut: PaymentStatus): string {
   switch (statut) {
@@ -146,10 +151,9 @@ export function paymentBadgeClass(statut: PaymentStatus): string {
 }
 
 // What the orders list flags: money PayGate took that the order could not
-// take (to refund), or an attempt PayGate never answered for (to check).
+// take (to refund).
 export function paymentFlag(payments: Pick<PaymentAttempt, "statut" | "anomalie">[] = []): { label: string; tone: string } | null {
   if (payments.some((p) => p.statut === "reussi" && p.anomalie)) return { label: "À rembourser", tone: "danger" };
-  if (payments.some((p) => p.anomalie === "non_confirme")) return { label: "À vérifier", tone: "warning" };
   return null;
 }
 
