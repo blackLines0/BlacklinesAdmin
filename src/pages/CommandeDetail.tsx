@@ -13,6 +13,7 @@ import {
   ORDER_STATUS_LABELS,
   PAYMENT_ANOMALY_LABELS,
   PAYMENT_STATUS_LABELS,
+  isUnconfirmed,
   paymentBadgeClass,
   statusBadgeClass,
   statusChangeQuestion,
@@ -163,7 +164,7 @@ export default function CommandeDetail() {
                 </div>
               </div>
               {order.payments
-                .filter((p) => p.anomalie)
+                .filter((p) => p.anomalie && !isUnconfirmed(p))
                 .map((p) => (
                   <div className="panel-body" key={`anomalie-${p.id}`} style={{ paddingBottom: 0 }}>
                     <span className={`badge ${p.statut === "reussi" ? "danger" : "warning"}`}>
@@ -187,7 +188,12 @@ export default function CommandeDetail() {
                     {order.payments.map((p) => (
                       <tr key={p.id}>
                         <td className="cell-muted">{formatDate(p.createdAt)}</td>
-                        <td><span className={`badge ${paymentBadgeClass(p.statut)}`}>{PAYMENT_STATUS_LABELS[p.statut]}</span></td>
+                        <td>
+                          <span className={`badge ${paymentBadgeClass(p.statut)}`}>{PAYMENT_STATUS_LABELS[p.statut]}</span>
+                          {isUnconfirmed(p) ? (
+                            <div className="cell-muted" style={{ fontSize: 12 }}>Pas validé en 1 min</div>
+                          ) : null}
+                        </td>
                         <td>
                           <div className="cell-primary">{p.telephone}</div>
                           <div className="cell-muted" style={{ fontSize: 12 }}>{NETWORK_LABELS[p.reseau]}</div>
