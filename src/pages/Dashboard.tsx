@@ -5,9 +5,10 @@ import { apiFetch } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { brandTagClass, formatPrice, ORDER_STATUS_LABELS, statusBadgeClass, type OrderStatus } from "../lib/format";
 
-type Period = "7d" | "30d" | "6m" | "1y" | "custom";
+type Period = "today" | "7d" | "30d" | "6m" | "1y" | "custom";
 
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: "today", label: "Aujourd'hui" },
   { value: "7d", label: "7 jours" },
   { value: "30d", label: "Mois" },
   { value: "6m", label: "6 mois" },
@@ -16,6 +17,7 @@ const PERIOD_OPTIONS: { value: Period; label: string }[] = [
 ];
 
 const PERIOD_TITLES: Record<Period, string> = {
+  today: "Ventes — aujourd'hui, heure par heure",
   "7d": "Ventes — 7 derniers jours",
   "30d": "Ventes — 30 derniers jours",
   "6m": "Ventes — 6 derniers mois",
@@ -28,6 +30,10 @@ interface DashboardData {
   commandesCount: number;
   panierMoyen: number;
   parCanal: { enLigne: number; boutique: number };
+  // Delivery fees of the sales, kept out of the turnover (they go to the courier).
+  fraisLivraison: number;
+  // Pay-on-delivery orders not shipped yet.
+  aEncaisser: { count: number; montant: number };
   ventesParMarque: { slug: string; nom: string; pct: number }[];
   topProducts: { nom: string; ventes: number; montant: number; image: string | null }[];
   salesTimeline: { label: string; total: number }[];
@@ -128,6 +134,11 @@ function DashboardContent({ data, period }: { data: DashboardData; period: Perio
             <span>En ligne <strong>{formatPrice(data.parCanal.enLigne)}</strong></span>
             <span>Boutique <strong>{formatPrice(data.parCanal.boutique)}</strong></span>
           </div>
+          {data.fraisLivraison > 0 ? (
+            <div className="kpi-split" style={{ marginTop: 6 }}>
+              <span>Livraisons, non incluses <strong>{formatPrice(data.fraisLivraison)}</strong></span>
+            </div>
+          ) : null}
         </div>
         <div className="kpi-card">
           <div className="kpi-top">
@@ -135,6 +146,7 @@ function DashboardContent({ data, period }: { data: DashboardData; period: Perio
             <div className="kpi-icon cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 8H6" /><circle cx="9" cy="21" r="1.4" /><circle cx="18" cy="21" r="1.4" /></svg></div>
           </div>
           <div className="kpi-value">{data.commandesCount}</div>
+          <div className="kpi-split"><span>Payées, expédiées ou livrées</span></div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top">
@@ -142,6 +154,18 @@ function DashboardContent({ data, period }: { data: DashboardData; period: Perio
             <div className="kpi-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg></div>
           </div>
           <div className="kpi-value">{formatPrice(data.panierMoyen)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-top">
+            <span className="kpi-label">À encaisser</span>
+            <div className="kpi-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="6" width="22" height="13" rx="2" /><circle cx="12" cy="12.5" r="2.5" /><path d="M5 10v5M19 10v5" /></svg></div>
+          </div>
+          <div className="kpi-value">{formatPrice(data.aEncaisser.montant)}</div>
+          <div className="kpi-split">
+            <span>
+              <strong>{data.aEncaisser.count}</strong> commande{data.aEncaisser.count > 1 ? "s" : ""} payable{data.aEncaisser.count > 1 ? "s" : ""} à la livraison
+            </span>
+          </div>
         </div>
       </div>
 
@@ -167,7 +191,7 @@ function DashboardContent({ data, period }: { data: DashboardData; period: Perio
 
         <div className="panel">
           <div className="panel-head">
-            <div><h3>Ventes par marque</h3><div className="sub">Commandes confirmées</div></div>
+            <div><h3>Ventes par marque</h3><div className="sub">Commandes payées</div></div>
           </div>
           <div className="panel-body">
             {data.ventesParMarque.length === 0 ? (
@@ -205,7 +229,7 @@ function DashboardContent({ data, period }: { data: DashboardData; period: Perio
       <div className="two-col" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
         <div className="panel">
           <div className="panel-head">
-            <div><h3>Commandes récentes</h3><div className="sub">{data.recentOrders.length} dernières commandes</div></div>
+            <div><h3>Commandes récentes</h3><div className="sub">Payées, ou à préparer pour un paiement à la livraison</div></div>
             <a className="link-more" href="/commandes">Voir tout →</a>
           </div>
           <div className="table-wrap">
