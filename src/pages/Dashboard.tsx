@@ -62,7 +62,7 @@ function todayIso() {
 }
 
 export default function Dashboard() {
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = useState<Period>("today");
   const [from, setFrom] = useState(todayIso());
   const [to, setTo] = useState(todayIso());
 
